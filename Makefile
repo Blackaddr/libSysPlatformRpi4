@@ -76,5 +76,5 @@ DEP_BUILD_LIST = \
 MAKEFILE_NAME ?= Makefile
 
 # Check if build engine location has already been defined
-export LIB_BUILD_ENGINE_LOC ?= $(CURDIR)/scripts/avalon_lib_build_engine/
+export LIB_BUILD_ENGINE_LOC ?= $(CURDIR)/scripts/avalon_lib_build_engine.$(MCU_TYPE)/
 include $(LIB_BUILD_ENGINE_LOC)/Makefile.inc
