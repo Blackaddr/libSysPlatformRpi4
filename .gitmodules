@@ -1,0 +1,6 @@
+[submodule "sysPlatformBase"]
+	path = sysPlatformBase
+	url = git@bitbucket.org:aviateaudio/sysplatformbase.git
+[submodule "scripts/avalon_lib_build_engine"]
+	path = scripts/avalon_lib_build_engine.rpi4
+	url = git@bitbucket.org:blackaddr/avalon_lib_build_engine.rpi4.git
