@@ -1,3 +1,4 @@
+#include "circle/sched/mutex.h"
 #include "sysPlatform/SysTypes.h"
 #include "sysPlatform/SysMutex.h"
 
@@ -5,10 +6,19 @@
 
 namespace std {
 
-mutex::mutex() {}
-mutex::~mutex() {}
-void mutex::lock() {}
-void mutex::unlock() {}
+mutex::mutex()
+{
+    mxPtr = new CMutex;
+}
+
+mutex::~mutex()
+{
+    if (mxPtr) { delete (CMutex*)mxPtr; }
+}
+
+void mutex::lock() { ((CMutex*)mxPtr)->Acquire(); }
+//bool mutex<T>::try_lock() { return mx.try_lock(); }
+void mutex::unlock() { ((CMutex*)mxPtr)->Release(); }
 
 }
 

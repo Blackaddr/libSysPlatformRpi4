@@ -4,19 +4,186 @@
 #include "sysPlatform/SysLogger.h"
 #include "sysPlatform/SysDebugPrint.h"
 #include "sysPlatform/SysInitialize.h"
+#include "globalInstances.h"
+
+#define BOOT_PARTITION	"emmc1-1"
+
+// Network configuration
+#define USE_DHCP
+
+#ifndef USE_DHCP
+static const u8 IPAddress[]      = {192, 168, 0, 250};
+static const u8 NetMask[]        = {255, 255, 255, 0};
+static const u8 DefaultGateway[] = {192, 168, 0, 1};
+static const u8 DNSServer[]      = {192, 168, 0, 1};
+#endif
 
 namespace SysPlatform {
+
+//////////////////////////
+// LIBCIRCLE SINGLETONS
+CActLED             g_actLED;
+CKernelOptions		g_options;
+CDeviceNameService	g_deviceNameService;
+CExceptionHandler   g_exceptionHandler;
+CInterruptSystem    g_interrupt;
+CScheduler          g_scheduler;
+CTimer              g_timer(&g_interrupt);
+CCPUThrottle        g_cpuThrottle;
+
+CEMMCDevice	    	g_emmc(&g_interrupt, &g_timer, &g_actLED);
+CFATFileSystem		g_fileSystem;
+CUSBHCIDevice		g_usbHci(&g_interrupt, &g_timer);
+#ifdef USE_DHCP
+CNetSubSystem		g_net;
+#else
+CNetSubSystem		g_net(IPAddress, NetMask, DefaultGateway, DNSServer);
+#endif
+
+CScreenDevice  g_screen(g_options.GetWidth (), g_options.GetHeight ());
+CLogger        g_logger(g_options.GetLogLevel (), &g_timer);
+//////////////////////////////
+
+CInterruptSystem*   g_interruptSysPtr      = nullptr;
+CExceptionHandler*  g_exceptionHandlerPtr  = nullptr;
+CScreenDevice*      g_screenPtr            = nullptr;  // TODO might not have a GET function
+CLogger*            g_loggerPtr            = nullptr;
+CActLED*            g_actLedPtr            = nullptr;
+CDeviceNameService* g_deviceNameServicePtr = nullptr;
+CKernelOptions*     g_optionsPtr           = nullptr;
+CTimer*             g_timerPtr             = nullptr;
+CScheduler*         g_schedulerPtr         = nullptr;
+CCPUThrottle*       g_cpuThrottlePtr       = nullptr;
+
+CEMMCDevice*    g_emmcPtr       = nullptr;
+CFATFileSystem* g_fileSystemPtr = nullptr;
+CUSBHCIDevice*  g_usbHciPtr     = nullptr;
+CNetSubSystem*  g_netPtr        = nullptr;
+
+//static CScreenDevice  g_Screen(g_Options.GetWidth (), g_Options.GetHeight ());
+
+//static bool g_isInitialized = false;
+
+static void __attribute__((unused)) enable_cycle_counter_el0(void)
+{
+	uint64_t val;
+	/* Disable cycle counter overflow interrupt */
+	asm volatile("msr pmintenset_el1, %0" : : "r" ((uint64_t)(0 << 31)));
+	/* Enable cycle counter */
+	asm volatile("msr pmcntenset_el0, %0" :: "r" (1 << 31));
+	/* Enable user-mode access to cycle counters. */
+	asm volatile("msr pmuserenr_el0, %0" :: "r" ((1 << 0) | (1 << 2)));
+	/* Clear cycle counter and start */
+	asm volatile("mrs %0, pmcr_el0" : "=r" (val));
+	val |= ((1 << 0) | (1 << 2));
+	asm volatile("isb");
+	asm volatile("msr pmcr_el0, %0" :: "r" (val));
+	val = (1 << 27);
+	asm volatile("msr pmccfiltr_el0, %0" :: "r" (val));
+}
 
 static bool isInitialized = false;
 
 int  sysInitialize() {
-    isInitialized = true;
-    return SYS_SUCCESS;
+	g_interruptSysPtr      = CInterruptSystem::Get();
+	g_exceptionHandlerPtr  = CExceptionHandler::Get();
+	g_screenPtr            = &g_screen;
+	g_loggerPtr            = CLogger::Get();
+	g_actLedPtr            = CActLED::Get();
+	g_deviceNameServicePtr = CDeviceNameService::Get();
+	g_optionsPtr           = CKernelOptions::Get();
+	g_timerPtr             = CTimer::Get();
+	g_schedulerPtr         = CScheduler::Get();
+	g_cpuThrottlePtr       = CCPUThrottle::Get();
+
+	g_emmcPtr       = &g_emmc;
+	g_fileSystemPtr = &g_fileSystem;
+	g_usbHciPtr     = &g_usbHci;
+	g_netPtr        = CNetSubSystem::Get();
+
+    if (!g_interruptSysPtr || !g_exceptionHandlerPtr || !g_screenPtr || !g_loggerPtr ||
+	    !g_actLedPtr || !g_deviceNameServicePtr || !g_optionsPtr || !g_timerPtr ||
+		!g_schedulerPtr || !g_cpuThrottlePtr || !g_emmcPtr || !g_fileSystemPtr ||
+		!g_usbHciPtr || !g_netPtr) { return SYS_FAILURE; }
+
+	g_actLedPtr->Blink (5);	// show we are alive
+
+	boolean bOK = TRUE;
+	enable_cycle_counter_el0();
+
+	if (!g_screenPtr) { bOK = false; }
+
+	if (bOK)
+	{
+		bOK = g_screenPtr->Initialize ();
+	}
+
+	if (bOK)
+	{
+		CDevice *pTarget = g_deviceNameServicePtr->GetDevice(g_optionsPtr->GetLogDevice (), FALSE);
+		if (pTarget == 0)
+		{
+			pTarget = g_screenPtr;
+		}
+
+		bOK = g_loggerPtr->Initialize (pTarget);
+	}
+
+	if (bOK)
+	{
+		bOK = g_interruptSysPtr->Initialize ();
+	}
+
+	if (bOK)
+	{
+		bOK = g_timerPtr->Initialize ();
+	}
+
+	if (bOK)
+	{
+		bOK = g_emmcPtr->Initialize ();
+	}
+
+	if (bOK)
+	{
+		bOK = g_netPtr->Initialize ();
+	}
+
+    if (bOK)
+	{
+		// Mount file system
+		CDevice *pPartition = g_deviceNameServicePtr->GetDevice (BOOT_PARTITION, TRUE);
+		if (pPartition == 0)
+		{
+			g_loggerPtr->Write("initialize", TLogSeverity::LogPanic, "Partition not found: %s", BOOT_PARTITION);
+
+		}
+
+		if (!g_fileSystemPtr->Mount (pPartition))
+		{
+			g_loggerPtr->Write("initialize", TLogSeverity::LogPanic, "Cannot mount partition: %s", BOOT_PARTITION);
+		}
+
+		//tftpServerPtr = new CTFTPFileServer (&g_Net, &g_FileSystem);
+	}
+
+	if (bOK) {
+		sysProgrammer.begin();
+	}
+
+	if (bOK) {
+        isInitialized = true;
+        return SYS_SUCCESS;
+    } else {
+        isInitialized = false;
+        return SYS_FAILURE;
+    }
 }
 
 bool sysIsInitialized() { return isInitialized; }
 
 void sysDeinitialize() {
+    if (g_screenPtr) { delete g_screenPtr; }
     isInitialized = false;
     return;
 }

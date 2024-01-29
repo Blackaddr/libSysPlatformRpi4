@@ -7,8 +7,25 @@ namespace SysPlatform {
 
 SysThreads sysThreads;
 
-struct SysThreads::_impl {
+class ThreadTask {
+public:
+    ThreadTask() = delete;
+    ThreadTask(SysThreads::SysThreadFunction functionToRunIn, void* argIn, int stackSizeIn, void *stackIn)
+      // for some reason, using the non-default constructor for CTask results in the task not starting
+      //: CTask(stackSize),
+      : functionToRun(functionToRunIn), argPtr(argIn), stackSize(stackSizeIn), stack(stackIn)
+      {
 
+      }
+
+    SysThreads::SysThreadFunction functionToRun;
+    void* argPtr;
+    int stackSize;
+    void* stack = nullptr;
+};
+
+struct SysThreads::_impl {
+    std::vector<std::shared_ptr<ThreadTask>> threadsVec;
 };
 
 SysThreads::SysThreads()

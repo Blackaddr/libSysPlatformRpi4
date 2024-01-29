@@ -1,5 +1,7 @@
 #include "sysPlatform/SysTypes.h"
 #include "sysPlatform/SysLogger.h"
+#include "sysPlatform/SysInitialize.h"
+#include "globalInstances.h"
 
 namespace SysPlatform {
 
@@ -22,7 +24,7 @@ void SysLogger::begin()
 
 void SysLogger::begin(unsigned baudRate)
 {
-    
+
 }
 
 void SysLogger::getSeverityStr(LogSeverity severity, char* str)
@@ -51,14 +53,24 @@ int SysLogger::read()
 
 int SysLogger::printf(const char *fmt, ...)
 {
-    int result = 0;
-    va_list args;
+    if (!sysIsInitialized() || !g_loggerPtr) { return 0; }
 
-    va_start(args, fmt);
-    //result = printf(fmt, args);
-    va_end(args);
+	va_list var;
+	va_start(var, fmt);
+	CString msg;
+	msg.FormatV(fmt, var);
+	va_end(var);
+	g_loggerPtr->Write("", TLogSeverity::LogNotice, msg);
+	return msg.GetLength();
 
-    return result;
+    // int result = 0;
+    // va_list args;
+
+    // va_start(args, fmt);
+    // //result = printf(fmt, args);
+    // va_end(args);
+
+    // return result;
 }
 
 SysLogger::operator bool() const
