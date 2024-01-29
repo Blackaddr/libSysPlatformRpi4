@@ -38,7 +38,27 @@ void SysCpuControl::AudioInterrupts()
     
 }
 
+void SysCpuControl::AudioTriggerInterrupt()
+{
+    
+}
+
+void SysCpuControl::AudioSetInterruptPriority(int priority)
+{
+    
+}
+
+void SysCpuControl::AudioAttachInterruptVector(void (*function)(void))
+{
+    
+}
+
 void SysCpuControl::SysDataSyncBarrier()
+{
+
+}
+
+void SysCpuControl::shutdownUsb()
 {
 
 }

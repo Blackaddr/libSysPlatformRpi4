@@ -26,4 +26,14 @@ uint64_t SysTimer::cycleCnt64()
     return 0;
 }
 
+void SysTimer::delayMilliseconds(unsigned x)
+{
+
+}
+
+void SysTimer::delayMicroseconds(unsigned x)
+{
+
+}
+
 }

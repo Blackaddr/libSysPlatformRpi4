@@ -2,6 +2,12 @@
 
 namespace SysPlatform {
 
+SysMidiBase::SysMidiBase() = default;
+SysMidiBase::~SysMidiBase() = default;
+
+////////////////
+// SERIAL MIDI
+////////////////
 #if defined(PROCESS_SERIAL_MIDI)
 SysSerialMidi sysSerialMidi;
 
@@ -11,6 +17,11 @@ SysSerialMidi::SysSerialMidi()
 }
 
 SysSerialMidi::~SysSerialMidi()
+{
+
+}
+
+void SysSerialMidi::init()
 {
 
 }
@@ -56,6 +67,9 @@ void SysSerialMidi::sendProgramChange(unsigned program, unsigned channel)
 }
 #endif
 
+/////////////
+// USB MIDI
+/////////////
 #if defined(PROCESS_USB_MIDI)
 SysUsbMidi sysUsbMidi;
 

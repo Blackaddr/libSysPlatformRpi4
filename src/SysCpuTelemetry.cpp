@@ -57,4 +57,29 @@ float  SysCpuTelemetry::getHeapUsageRatio()
     return 0;
 }
 
+size_t SysCpuTelemetry::getRam0Size()
+{
+    return 0;
+}
+
+float  SysCpuTelemetry::getRam0UsageRatio()
+{
+    return 0.0f;
+}
+
+size_t SysCpuTelemetry::getRam1Size()
+{
+    return 0;
+}
+
+float  SysCpuTelemetry::getRam1UsageRatio()
+{
+    return 0.0f;
+}
+
+void SysCpuTelemetry::debugShowMemoryConfig()
+{
+    
+}
+
 }

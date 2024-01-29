@@ -32,11 +32,12 @@ CPP_SRC_LIST += \
     SysSpi \
     SysThreads \
     SysTimer \
+    SysTypes \
     SysWatchdog \
     AudioStream
 
 
-S_SRC_LIST = 
+S_SRC_LIST =
 
 # Do not include $(TARGET_NAME).h in API_HEADER LIST. This file is required and handled separately.
 API_HEADER_LIST += \
@@ -71,7 +72,8 @@ API_HEADER_LIST += \
 
 # List of Git-repo dependencies
 DEP_BUILD_LIST = \
-    Blackaddr/rpicircle.git
+    Blackaddr/rpicircle.git \
+    Blackaddr/arm_math_aarch64.git
 
 MAKEFILE_NAME ?= Makefile
 

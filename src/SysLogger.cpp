@@ -15,6 +15,21 @@ SysLogger::~SysLogger()
 
 }
 
+void SysLogger::begin()
+{
+
+}
+
+void SysLogger::begin(unsigned baudRate)
+{
+    
+}
+
+void SysLogger::getSeverityStr(LogSeverity severity, char* str)
+{
+
+}
+
 void SysLogger::log(const char *pMessage, ...)
 {
 
@@ -49,6 +64,11 @@ int SysLogger::printf(const char *fmt, ...)
 SysLogger::operator bool() const
 {
     return true;
+}
+
+void SysLogger::flush()
+{
+
 }
 
 }
