@@ -11,7 +11,7 @@ const     size_t SYS_SPI_MEM_SIZE = 8*1024*1024; // 8 MiB
 constexpr size_t MAX_BUFFER_SIZE = 256*2*4;      // Two audio blocks at 256 samples, float values
 
 struct SysSpi::_impl {
-    uint8_t* mem               = nullptr;
+    volatile uint8_t* mem      = nullptr;
     uint8_t* buffer            = nullptr;
     size_t   dmaBufferCopySize = 0;
     bool     isStarted         = false;
@@ -25,7 +25,7 @@ SysSpi::SysSpi(bool useDma)
 
 SysSpi::~SysSpi()
 {
-    if (m_pimpl->mem) free(m_pimpl->mem);
+    if (m_pimpl->mem) free((void*)m_pimpl->mem);
 }
 
 void SysSpi::begin()
@@ -33,9 +33,11 @@ void SysSpi::begin()
     m_pimpl->mem    = (uint8_t*)malloc(SYS_SPI_MEM_SIZE);
     m_pimpl->buffer = (uint8_t*)malloc(MAX_BUFFER_SIZE);
     if (!m_pimpl->mem || !m_pimpl->buffer) {
-        SYS_DEBUG_PRINT(sysLogger.printf("SysSpi::begin(): error, unble to allocate SPI mem model"));
+        SYS_DEBUG_PRINT(sysLogger.printf("SysSpi::begin(): ERROR, unble to allocate SPI mem model"));
+    } else {
+        m_pimpl->isStarted = true;
     }
-    m_pimpl->isStarted = true;
+
 }
 
 void SysSpi::beginTransaction(SysSpiSettings settings)
@@ -82,7 +84,7 @@ void SysSpi::write(size_t address, uint8_t *src, size_t numBytes)
 void SysSpi::zero(size_t address, size_t numBytes)
 {
     if (!m_pimpl->mem || !m_pimpl->isStarted) { return; }
-    write(address, 0);
+    std::memset((void*)&m_pimpl->mem[address], 0, numBytes);
 }
 
 
@@ -107,7 +109,7 @@ uint8_t SysSpi::read(size_t address)
     if (!m_pimpl->mem || !m_pimpl->isStarted) { return 0; }
     if (address < SYS_SPI_MEM_SIZE) {
         return m_pimpl->mem[address];
-    }
+    } else { return 0; }
 }
 
 void SysSpi::read(size_t address, uint8_t *dest, size_t numBytes)
