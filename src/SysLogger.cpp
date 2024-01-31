@@ -53,24 +53,15 @@ int SysLogger::read()
 
 int SysLogger::printf(const char *fmt, ...)
 {
-    if (!sysIsInitialized() || !g_loggerPtr) { return 0; }
+    if (!g_loggerPtr) { return 0; }
 
 	va_list var;
 	va_start(var, fmt);
 	CString msg;
 	msg.FormatV(fmt, var);
 	va_end(var);
-	g_loggerPtr->Write("", TLogSeverity::LogNotice, msg);
+	g_loggerPtr->WriteRaw(msg);
 	return msg.GetLength();
-
-    // int result = 0;
-    // va_list args;
-
-    // va_start(args, fmt);
-    // //result = printf(fmt, args);
-    // va_end(args);
-
-    // return result;
 }
 
 SysLogger::operator bool() const

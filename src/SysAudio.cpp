@@ -18,9 +18,12 @@ static void rxIsr(void *param)
 
 static void createSoundDevice()
 {
+    static bool deviceCreated = false;
+
+    if (deviceCreated) { return; }
     if (!m_soundDevPtr) {
         m_soundDevPtr = new CI2SSoundBaseDevice (g_interruptSysPtr, AUDIO_SAMPLE_RATE_HZ, 2*AUDIO_SAMPLES_PER_BLOCK, TRUE /* RPI is slave*/,
-						nullptr, 0, CI2SSoundBaseDevice::DeviceModeTXRX);
+						g_i2cMasterPtr, 0, CI2SSoundBaseDevice::DeviceModeTXRX);
         assert (m_soundDevPtr != 0);
     }
 
@@ -50,6 +53,7 @@ static void createSoundDevice()
     }
     //LogScreen("AudioInputI2S::begin() completed sound device setup\n");
     g_loggerPtr->Write("SysAudio:createSoundDevice", TLogSeverity::LogError, "completed sound device setup\n");
+    deviceCreated = true;
 }
 
 /////////////

@@ -32,6 +32,7 @@
 #include "sysPlatform/SysTypes.h"
 #include "sysPlatform/SysCpuControl.h"
 #include "sysPlatform/SysTimer.h"
+#include "sysPlatform/SysLogger.h"
 #include "AudioStream.h"
 
 using namespace SysPlatform;
@@ -462,8 +463,8 @@ void AudioStream::update_stop(void)
 	update_scheduled = false;
 }
 
-void AudioStream::update_all(void) {
-	SysCpuControl::AudioTriggerInterrupt();
+void AudioStream::update_all(void) {	
+	software_isr();  //SysCpuControl::AudioTriggerInterrupt();
 }
 
 void AudioStream::setOrderedUpdate(bool orderedUpdate) {

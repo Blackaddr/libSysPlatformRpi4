@@ -18,6 +18,12 @@ static const u8 DefaultGateway[] = {192, 168, 0, 1};
 static const u8 DNSServer[]      = {192, 168, 0, 1};
 #endif
 
+// I2C Master config
+#define I2C_MASTER_DEVICE	1		// 0 on Raspberry Pi 1 Rev. 1 boards, 1 otherwise
+#define I2C_MASTER_CONFIG	0		// 0 or 1 on Raspberry Pi 4, 0 otherwise
+#define I2C_FAST_MODE		FALSE		// standard mode (100 Kbps) or fast mode (400 Kbps)
+#define I2C_SLAVE_ADDRESS	0x1A	// 7 bit slave address
+
 namespace SysPlatform {
 
 //////////////////////////
@@ -54,15 +60,12 @@ CKernelOptions*     g_optionsPtr           = nullptr;
 CTimer*             g_timerPtr             = nullptr;
 CScheduler*         g_schedulerPtr         = nullptr;
 CCPUThrottle*       g_cpuThrottlePtr       = nullptr;
+CI2CMaster*         g_i2cMasterPtr         = nullptr;
 
 CEMMCDevice*    g_emmcPtr       = nullptr;
 CFATFileSystem* g_fileSystemPtr = nullptr;
 CUSBHCIDevice*  g_usbHciPtr     = nullptr;
 CNetSubSystem*  g_netPtr        = nullptr;
-
-//static CScreenDevice  g_Screen(g_Options.GetWidth (), g_Options.GetHeight ());
-
-//static bool g_isInitialized = false;
 
 static void __attribute__((unused)) enable_cycle_counter_el0(void)
 {
@@ -155,16 +158,14 @@ int  sysInitialize() {
 		CDevice *pPartition = g_deviceNameServicePtr->GetDevice (BOOT_PARTITION, TRUE);
 		if (pPartition == 0)
 		{
-			g_loggerPtr->Write("initialize", TLogSeverity::LogPanic, "Partition not found: %s", BOOT_PARTITION);
+			g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogPanic, "Partition not found: %s\n", BOOT_PARTITION);
 
 		}
 
 		if (!g_fileSystemPtr->Mount (pPartition))
 		{
-			g_loggerPtr->Write("initialize", TLogSeverity::LogPanic, "Cannot mount partition: %s", BOOT_PARTITION);
+			g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogPanic, "Cannot mount partition: %s\n", BOOT_PARTITION);
 		}
-
-		//tftpServerPtr = new CTFTPFileServer (&g_Net, &g_FileSystem);
 	}
 
 	if (bOK) {
@@ -172,6 +173,14 @@ int  sysInitialize() {
 	}
 
 	if (bOK) {
+		g_i2cMasterPtr = new CI2CMaster(I2C_MASTER_DEVICE, I2C_FAST_MODE, I2C_MASTER_CONFIG);
+		bOK = false;
+		if (g_i2cMasterPtr) { bOK = g_i2cMasterPtr->Initialize(); }
+		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogPanic, "Cannot create CI2CMaster\n");}
+	}
+
+	if (bOK) {
+		g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogDebug, "initialization complete!\n");
         isInitialized = true;
         return SYS_SUCCESS;
     } else {
@@ -192,6 +201,7 @@ void sysDeinitialize() {
 
 static SysPlatform::SysCpuControl::ShutdownMode run() {
     using namespace SysPlatform;
+	sysLogger.printf("run() entered\n");
 
     //auto& codec = hardwareControls.getCodec();
 
@@ -200,7 +210,7 @@ static SysPlatform::SysCpuControl::ShutdownMode run() {
         //if (sysProgrammer.isXferInProgress() && codec.isEnabled()) { codec.disable(); }
 
         if (sysProgrammer.isNewProgrammingReceived()) {
-			SYS_DEBUG_PRINT(sysLogger.printf("***New firmware received, REBOOTING!!!"));
+			SYS_DEBUG_PRINT(sysLogger.printf("***New firmware received, REBOOTING!!!\n"));
 			SysCpuControl::yield();  // must yield to give the TFTP thread a chance to close the connection
 			return SysCpuControl::ShutdownMode::REBOOT;
 		}
@@ -213,9 +223,6 @@ int main (void)
 {
     using namespace SysPlatform;
 
-	if (!SysPlatform::sysInitialize()) {
-        return SysCpuControl::halt();
-    }
     setup();
 	SysCpuControl::ShutdownMode mode = run();
 

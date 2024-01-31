@@ -11,6 +11,7 @@
 #include "circle/exceptionhandler.h"
 #include "circle/sched/scheduler.h"
 #include "circle/cputhrottle.h"
+#include "circle/i2cmaster.h"
 
 #include "SDCard/emmc.h"  // for CEMMCDevice
 #include "circle/fs/fat/fatfs.h"  // for CFATFileSystem
@@ -29,6 +30,7 @@ extern CKernelOptions*     g_optionsPtr;
 extern CTimer*             g_timerPtr;
 extern CScheduler*         g_schedulerPtr;
 extern CCPUThrottle*       g_cpuThrottlePtr;
+extern CI2CMaster*         g_i2cMasterPtr;
 
 extern CEMMCDevice*    g_emmcPtr;
 extern CFATFileSystem* g_fileSystemPtr;
