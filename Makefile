@@ -34,7 +34,8 @@ CPP_SRC_LIST += \
     SysTimer \
     SysTypes \
     SysWatchdog \
-    AudioStream
+    AudioStream \
+    SysCodecWM8731
 
 
 S_SRC_LIST =

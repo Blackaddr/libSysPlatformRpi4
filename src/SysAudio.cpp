@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include "globalInstances.h"
 #include "circle/sound/i2ssoundbasedevice.h"
+#include "SysCodecWM8731.h"
 #include "sysPlatform/SysAudio.h"
 
 #define FORMAT		    SoundFormatSigned16
@@ -8,6 +9,8 @@
 #define QUEUE_SIZE_MSECS 100		// size of the sound queue in milliseconds duration
 
 namespace SysPlatform {
+
+SysCodec sysCodec;
 
 CI2SSoundBaseDevice* m_soundDevPtr = nullptr;
 
@@ -60,7 +63,7 @@ static void createSoundDevice()
 // SysCodec
 /////////////
 struct SysCodec::_impl {
-    int dummy;
+    SysCodecWM8731* m_codecPtr = nullptr;
 };
 
 
@@ -72,94 +75,110 @@ SysCodec::SysCodec()
 
 SysCodec::~SysCodec()
 {
-
+    if (m_pimpl->m_codecPtr) { delete m_pimpl->m_codecPtr; }
 }
 
+void SysCodec::begin(void)
+{
+    if (!m_pimpl->m_codecPtr) {
+        if (g_i2cMasterPtr) {
+            m_pimpl->m_codecPtr = new SysCodecWM8731(g_i2cMasterPtr, WM8731_I2C_ADDRESS);
+        }
+    }
+}
 
 void SysCodec::disable(void)
 {
-
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->disable(); }
 }
 
 
 void SysCodec::enable(void)
 {
-
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->enable(); }
 }
 
 bool SysCodec::isEnabled()
 {
+    // if (m_pimpl->m_codecPtr) { return m_pimpl->m_codecPtr->isEnabled(); }
+    // else { return false; }
     return false;
 }
 
 
 void SysCodec::setLeftInputGain(int val)
 {
-
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->setLeftInputGain(val); }
 }
 
 
 void SysCodec::setRightInputGain(int val)
 {
-
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->setRightInputGain(val); }
 }
 
 
 void SysCodec::setLeftInMute(bool val)
 {
-
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->setLeftInMute(val); }
 }
 
 
 void SysCodec::setRightInMute(bool val)
 {
-
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->setRightInMute(val); }
 }
 
 
 void SysCodec::setLinkLeftRightIn(bool val)
 {
-
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->setLinkLeftRightIn(val); }
 }
 
 
 bool SysCodec::setLeftRightSwap(bool val)
 {
-    return false;
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->setLeftRightSwap(val); return true; }
+    else { return false; }
 }
 
 
 bool SysCodec::setHeadphoneVolume(float volume)
 {
-    return false;
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->setHeadphoneVolume(volume); return true; }
+    else { return false; }
 }
 
 
 bool SysCodec::setDacMute(bool val)
 {
-    return false;
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->setDacMute(val); return true; }
+    else { return false; }
 }
 
 
 bool SysCodec::setAdcBypass(bool val)
 {
-    return false;
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->setAdcBypass(val); return true; }
+    else { return false; }
 }
 
 
 void SysCodec::resetCodec(void)
 {
-
+    if (m_pimpl->m_codecPtr) { return m_pimpl->m_codecPtr->resetCodec(); }
 }
 
 bool SysCodec::recalibrateDcOffset(void)
 {
-    return false;
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->recalibrateDcOffset(); return true; }
+    else { return false; }
 }
 
 bool SysCodec::writeI2C(unsigned int addr, unsigned int val)
 {
-    return false;
+    if (m_pimpl->m_codecPtr) { return m_pimpl->m_codecPtr->writeI2C(addr, val); }
+    else { return false; }
 }
 
 

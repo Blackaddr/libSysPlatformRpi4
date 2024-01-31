@@ -4,6 +4,8 @@
 #include "sysPlatform/SysLogger.h"
 #include "sysPlatform/SysDebugPrint.h"
 #include "sysPlatform/SysInitialize.h"
+#include "sysPlatform/SysOTP.h"
+#include "sysPlatform/SysAudio.h"
 #include "globalInstances.h"
 
 #define BOOT_PARTITION	"emmc1-1"
@@ -119,6 +121,7 @@ int  sysInitialize() {
 	if (bOK)
 	{
 		bOK = g_screenPtr->Initialize ();
+		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "Screen init FAILED!\n"); }
 	}
 
 	if (bOK)
@@ -130,26 +133,31 @@ int  sysInitialize() {
 		}
 
 		bOK = g_loggerPtr->Initialize (pTarget);
+		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "device name service FAILED!\n"); }
 	}
 
 	if (bOK)
 	{
 		bOK = g_interruptSysPtr->Initialize ();
+		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "interrupt system FAILED!\n"); }
 	}
 
 	if (bOK)
 	{
 		bOK = g_timerPtr->Initialize ();
+		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "timer FAILED!\n"); }
 	}
 
 	if (bOK)
 	{
 		bOK = g_emmcPtr->Initialize ();
+		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "eMMC FAILED!\n"); }
 	}
 
 	if (bOK)
 	{
 		bOK = g_netPtr->Initialize ();
+		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "network FAILED!\n"); }
 	}
 
     if (bOK)
@@ -159,17 +167,22 @@ int  sysInitialize() {
 		if (pPartition == 0)
 		{
 			g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogPanic, "Partition not found: %s\n", BOOT_PARTITION);
+			bOK = false;
 
 		}
 
 		if (!g_fileSystemPtr->Mount (pPartition))
 		{
 			g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogPanic, "Cannot mount partition: %s\n", BOOT_PARTITION);
+			bOK = false;
 		}
 	}
 
 	if (bOK) {
-		sysProgrammer.begin();
+		if (sysProgrammer.begin() != SYS_SUCCESS) {
+			bOK = false;
+			g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "programmer FAILED!\n");
+		}
 	}
 
 	if (bOK) {
@@ -180,11 +193,19 @@ int  sysInitialize() {
 	}
 
 	if (bOK) {
+		if (SysOTP::begin() != SYS_SUCCESS) {
+			bOK = false;
+			g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogPanic, "Cannot initialize OTP\n");
+		}
+	}
+
+	if (bOK) {
 		g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogDebug, "initialization complete!\n");
         isInitialized = true;
         return SYS_SUCCESS;
     } else {
         isInitialized = false;
+		g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "initialization FAILED!\n");
         return SYS_FAILURE;
     }
 }
@@ -203,11 +224,14 @@ static SysPlatform::SysCpuControl::ShutdownMode run() {
     using namespace SysPlatform;
 	sysLogger.printf("run() entered\n");
 
-    //auto& codec = hardwareControls.getCodec();
-
     while(true)
 	{
-        //if (sysProgrammer.isXferInProgress() && codec.isEnabled()) { codec.disable(); }
+        //if (sysProgrammer.isXferInProgress() && sysCodec.isEnabled()) { sysCodec.disable(); }
+		if (sysProgrammer.isXferInProgress()) {
+			//if (sysCodec.isEnabled()) { sysLogger.printf("codec IS enabled\n"); }
+			//else { sysLogger.printf("codec is NOT enabled...\n"); }
+			//sysCodec.disable();
+		}
 
         if (sysProgrammer.isNewProgrammingReceived()) {
 			SYS_DEBUG_PRINT(sysLogger.printf("***New firmware received, REBOOTING!!!\n"));
