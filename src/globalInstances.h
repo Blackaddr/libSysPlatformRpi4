@@ -12,6 +12,7 @@
 #include "circle/sched/scheduler.h"
 #include "circle/cputhrottle.h"
 #include "circle/i2cmaster.h"
+#include "circle/serial.h"
 
 #include "SDCard/emmc.h"  // for CEMMCDevice
 #include "circle/fs/fat/fatfs.h"  // for CFATFileSystem
@@ -36,5 +37,8 @@ extern CEMMCDevice*    g_emmcPtr;
 extern CFATFileSystem* g_fileSystemPtr;
 extern CUSBHCIDevice*  g_usbHciPtr;
 extern CNetSubSystem*  g_netPtr;
+
+extern CSerialDevice* g_uart0Ptr;
+extern CSerialDevice* g_uart1Ptr;
 
 }

@@ -1,6 +1,8 @@
 #include <cstdlib>
 #include "globalInstances.h"
 #include "circle/sound/i2ssoundbasedevice.h"
+
+#include "sysPlatform/SysLogger.h"
 #include "SysCodecWM8731.h"
 #include "sysPlatform/SysAudio.h"
 
@@ -83,6 +85,9 @@ void SysCodec::begin(void)
     if (!m_pimpl->m_codecPtr) {
         if (g_i2cMasterPtr) {
             m_pimpl->m_codecPtr = new SysCodecWM8731(g_i2cMasterPtr, WM8731_I2C_ADDRESS);
+            if (m_pimpl->m_codecPtr) { SYS_DEBUG_PRINT(sysLogger.printf("SysCodec::begin(): successfully created the WM8731 codec\n")); }
+        } else {
+            SYS_DEBUG_PRINT(sysLogger.printf("SysCodec::begin(): ERROR: g_i2cMasterPtr is nullptr\n"));
         }
     }
 }
@@ -100,9 +105,8 @@ void SysCodec::enable(void)
 
 bool SysCodec::isEnabled()
 {
-    // if (m_pimpl->m_codecPtr) { return m_pimpl->m_codecPtr->isEnabled(); }
-    // else { return false; }
-    return false;
+    if (m_pimpl->m_codecPtr) { return m_pimpl->m_codecPtr->isEnabled(); }
+    else { return false; }
 }
 
 

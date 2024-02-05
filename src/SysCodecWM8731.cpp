@@ -10,20 +10,23 @@
 #include <circle/logger.h>
 #include <circle/types.h>
 
+#include "sysPlatform/SysLogger.h"
 #include "SysCodecWM8731.h"
 
 namespace SysPlatform {
 
 #define delay(x) do { CTimer::Get()->MsDelay(x);} while(0)
 
-static CLogger* loggerPtr = nullptr;
-
 SysCodecWM8731::SysCodecWM8731 (CI2CMaster *pI2CMaster, u8 uchI2CAddress)
 :	m_pI2CMaster (pI2CMaster),
 	m_uchI2CAddress (uchI2CAddress)
 {
     resetInternalReg();
-	loggerPtr = CLogger::Get();
+}
+
+SysCodecWM8731::~SysCodecWM8731()
+{
+	
 }
 
 // For WM8731 i2c register is 7 bits and value is 9 bits,
@@ -141,17 +144,17 @@ void SysCodecWM8731::resetInternalReg(void) {
 // Powerdown and disable the codec
 void SysCodecWM8731::disable(void)
 {
-	loggerPtr->WriteRaw("... disabling the codec\n");
-	// // set OUTPD to '1' (powerdown), which is bit 4
-	// regArray[WM8731_REG_POWERDOWN] |= 0x10;
-	// write(WM8731_REG_POWERDOWN, regArray[WM8731_REG_POWERDOWN]);
-	// delay(100); // wait for power down
+	SYS_DEBUG_PRINT(sysLogger.printf("SysCodecWM8731::disable(): ...disabling the codec\n"));
+	// set OUTPD to '1' (powerdown), which is bit 4
+	regArray[WM8731_REG_POWERDOWN] |= 0x10;
+	write(WM8731_REG_POWERDOWN, regArray[WM8731_REG_POWERDOWN]);
+	delay(100); // wait for power down
 
-	// // power down the rest of the supplies
-	// write(WM8731_REG_POWERDOWN, 0x9f); // complete codec powerdown
-	// delay(100);
+	// power down the rest of the supplies
+	write(WM8731_REG_POWERDOWN, 0x9f); // complete codec powerdown
+	delay(100);
 
-	// resetCodec();
+	resetCodec();
 	m_isEnabled = false;
 }
 
@@ -354,8 +357,9 @@ bool SysCodecWM8731::write(unsigned int reg, unsigned int val)
 // Powerup and unmute the codec
 void SysCodecWM8731::enable(void)
 {
-
+    SYS_DEBUG_PRINT(sysLogger.printf("SysCodecWM8731::enable(): enbaling the codec\n"));
     disable(); // disable first in case it was already powered up
+	delay(100);
 
     // Sequence from WAN0111.pdf
     // Begin configuring the codec

@@ -1,6 +1,8 @@
+#include "circle/serial.h"
 #include "sysPlatform/SysTypes.h"
 #include "sysPlatform/SysLogger.h"
 #include "sysPlatform/SysInitialize.h"
+#include "sysPlatform/SysCpuControl.h"
 #include "globalInstances.h"
 
 namespace SysPlatform {
@@ -61,7 +63,9 @@ int SysLogger::printf(const char *fmt, ...)
 	msg.FormatV(fmt, var);
 	va_end(var);
 	g_loggerPtr->WriteRaw(msg);
-	return msg.GetLength();
+	size_t bytesRemaining = msg.GetLength();
+	const char* ptr = msg;
+	return g_uart0Ptr->Write(ptr, bytesRemaining);
 }
 
 SysLogger::operator bool() const
@@ -71,7 +75,7 @@ SysLogger::operator bool() const
 
 void SysLogger::flush()
 {
-
+	if (g_uart0Ptr) { g_uart0Ptr->Flush(); }
 }
 
 }

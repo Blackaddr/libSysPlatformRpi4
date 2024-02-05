@@ -6,6 +6,7 @@
 #include "sysPlatform/SysInitialize.h"
 #include "sysPlatform/SysOTP.h"
 #include "sysPlatform/SysAudio.h"
+#include "sysPlatform/SysTimer.h"
 #include "globalInstances.h"
 
 #define BOOT_PARTITION	"emmc1-1"
@@ -25,6 +26,10 @@ static const u8 DNSServer[]      = {192, 168, 0, 1};
 #define I2C_MASTER_CONFIG	0		// 0 or 1 on Raspberry Pi 4, 0 otherwise
 #define I2C_FAST_MODE		FALSE		// standard mode (100 Kbps) or fast mode (400 Kbps)
 #define I2C_SLAVE_ADDRESS	0x1A	// 7 bit slave address
+
+// UARTS
+constexpr unsigned UART_BAUD_RATE = 2000000;
+//constexpr unsigned UART_BAUD_RATE = 921600;
 
 namespace SysPlatform {
 
@@ -68,6 +73,10 @@ CEMMCDevice*    g_emmcPtr       = nullptr;
 CFATFileSystem* g_fileSystemPtr = nullptr;
 CUSBHCIDevice*  g_usbHciPtr     = nullptr;
 CNetSubSystem*  g_netPtr        = nullptr;
+
+CSerialDevice* g_uart0Ptr = nullptr;
+CSerialDevice* g_uart1Ptr = nullptr;
+
 
 static void __attribute__((unused)) enable_cycle_counter_el0(void)
 {
@@ -142,6 +151,21 @@ int  sysInitialize() {
 		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "interrupt system FAILED!\n"); }
 	}
 
+	if (bOK) {
+		g_uart0Ptr = new CSerialDevice(g_interruptSysPtr,  false, 0);  // GPIO 14/15 for TX/RX
+		g_uart1Ptr = new CSerialDevice(g_interruptSysPtr, false, 3);  // GPIO 4/5 for TX/RX
+
+		if (!g_uart0Ptr || !g_uart1Ptr) {
+			bOK = false;
+			g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "UART allocate FAILED!\n");
+		}
+
+		bOK = g_uart0Ptr->Initialize(UART_BAUD_RATE, 8, 1, CSerialDevice::ParityNone);
+		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "UART0 init FAILED!\n"); }
+		bOK = g_uart1Ptr->Initialize(UART_BAUD_RATE, 8, 1, CSerialDevice::ParityNone);
+		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "UART1 init FAILED!\n"); }
+	}
+
 	if (bOK)
 	{
 		bOK = g_timerPtr->Initialize ();
@@ -208,6 +232,8 @@ int  sysInitialize() {
 		g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "initialization FAILED!\n");
         return SYS_FAILURE;
     }
+
+	SYS_DEBUG_PRINT(sysLogger.printf("*** SysPlatform::initialize() is complete\n"));
 }
 
 bool sysIsInitialized() { return isInitialized; }
@@ -222,20 +248,21 @@ void sysDeinitialize() {
 
 static SysPlatform::SysCpuControl::ShutdownMode run() {
     using namespace SysPlatform;
-	sysLogger.printf("run() entered\n");
+	SYS_DEBUG_PRINT(sysLogger.printf("run() entered\n"));
 
     while(true)
 	{
         //if (sysProgrammer.isXferInProgress() && sysCodec.isEnabled()) { sysCodec.disable(); }
 		if (sysProgrammer.isXferInProgress()) {
-			//if (sysCodec.isEnabled()) { sysLogger.printf("codec IS enabled\n"); }
-			//else { sysLogger.printf("codec is NOT enabled...\n"); }
+			//if (sysCodec.isEnabled()) { SYS_DEBUG_PRINT(sysLogger.printf("XFER in progress...codec is ENABLED\n")); }
+			//else { SYS_DEBUG_PRINT(sysLogger.printf("XFER in progress...codec is DISABLED...\n")); }
 			//sysCodec.disable();
 		}
 
         if (sysProgrammer.isNewProgrammingReceived()) {
 			SYS_DEBUG_PRINT(sysLogger.printf("***New firmware received, REBOOTING!!!\n"));
 			SysCpuControl::yield();  // must yield to give the TFTP thread a chance to close the connection
+			SysTimer::delayMilliseconds(100);
 			return SysCpuControl::ShutdownMode::REBOOT;
 		}
 

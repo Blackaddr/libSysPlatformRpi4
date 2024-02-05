@@ -12,6 +12,7 @@ class SysCodecWM8731 {
 public:
     SysCodecWM8731() = delete;
 	SysCodecWM8731 (CI2CMaster *pI2CMaster, u8 uchI2CAddress = 0);
+	virtual ~SysCodecWM8731();
 
 
 	/// Mute and power down the codec.
