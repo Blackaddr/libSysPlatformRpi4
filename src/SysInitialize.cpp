@@ -76,6 +76,7 @@ CNetSubSystem*  g_netPtr        = nullptr;
 
 CSerialDevice* g_uart0Ptr = nullptr;
 CSerialDevice* g_uart1Ptr = nullptr;
+CSPIMaster*    g_spi0Ptr  = nullptr;
 
 
 static void __attribute__((unused)) enable_cycle_counter_el0(void)
@@ -211,9 +212,15 @@ int  sysInitialize() {
 
 	if (bOK) {
 		g_i2cMasterPtr = new CI2CMaster(I2C_MASTER_DEVICE, I2C_FAST_MODE, I2C_MASTER_CONFIG);
-		bOK = false;
 		if (g_i2cMasterPtr) { bOK = g_i2cMasterPtr->Initialize(); }
 		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogPanic, "Cannot create CI2CMaster\n");}
+	}
+
+	if (bOK) {
+		g_spi0Ptr = new CSPIMaster(5000000, 0, 0, 0);
+		if (g_spi0Ptr) { bOK = g_spi0Ptr->Initialize(); }
+		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogPanic, "Cannot create CSPIMasterDMA\n");}
+		else { SPI.setRawSpi(g_spi0Ptr); }
 	}
 
 	if (bOK) {

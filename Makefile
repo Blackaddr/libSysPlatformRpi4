@@ -35,7 +35,11 @@ CPP_SRC_LIST += \
     SysTypes \
     SysWatchdog \
     AudioStream \
-    SysCodecWM8731
+    SysCodecWM8731 \
+    Adafruit_GFX \
+    Adafruit_SPD0301 \
+    ArduinoApi \
+    SPI
 
 
 S_SRC_LIST =
@@ -77,6 +81,8 @@ DEP_BUILD_LIST = \
     Blackaddr/arm_math_aarch64.git
 
 MAKEFILE_NAME ?= Makefile
+
+SYS_INC_DIRS = -I./src/display
 
 # Check if build engine location has already been defined
 export LIB_BUILD_ENGINE_LOC ?= $(CURDIR)/scripts/avalon_lib_build_engine.$(MCU_TYPE)/
