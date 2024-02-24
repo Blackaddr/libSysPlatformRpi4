@@ -169,6 +169,8 @@ Adafruit_SPD0301::Adafruit_SPD0301(int8_t DC, int8_t RST, int8_t CS) : Adafruit_
   cs = CS;
 }
 
+Adafruit_SPD0301::~Adafruit_SPD0301() = default;
+
 
 void Adafruit_SPD0301::begin(uint8_t vccstate, bool reset) {
   _vccstate = vccstate;

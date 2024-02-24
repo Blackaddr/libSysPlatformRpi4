@@ -9,10 +9,13 @@
 #include "sysPlatform/SysTimer.h"
 #include "globalInstances.h"
 
+#include <circle/gpiopin.h>
+
 #define BOOT_PARTITION	"emmc1-1"
 
 // Network configuration
 #define USE_DHCP
+#define USE_SCREEN
 
 #ifndef USE_DHCP
 static const u8 IPAddress[]      = {192, 168, 0, 250};
@@ -53,7 +56,9 @@ CNetSubSystem		g_net;
 CNetSubSystem		g_net(IPAddress, NetMask, DefaultGateway, DNSServer);
 #endif
 
+#ifdef USE_SCREEN
 CScreenDevice  g_screen(g_options.GetWidth (), g_options.GetHeight ());
+#endif
 CLogger        g_logger(g_options.GetLogLevel (), &g_timer);
 //////////////////////////////
 
@@ -116,7 +121,7 @@ int  sysInitialize() {
 	g_usbHciPtr     = &g_usbHci;
 	g_netPtr        = CNetSubSystem::Get();
 
-    if (!g_interruptSysPtr || !g_exceptionHandlerPtr || !g_screenPtr || !g_loggerPtr ||
+    if (!g_interruptSysPtr || !g_exceptionHandlerPtr || !g_loggerPtr ||
 	    !g_actLedPtr || !g_deviceNameServicePtr || !g_optionsPtr || !g_timerPtr ||
 		!g_schedulerPtr || !g_cpuThrottlePtr || !g_emmcPtr || !g_fileSystemPtr ||
 		!g_usbHciPtr || !g_netPtr) { return SYS_FAILURE; }
@@ -126,6 +131,7 @@ int  sysInitialize() {
 	boolean bOK = TRUE;
 	enable_cycle_counter_el0();
 
+#ifdef USE_SCREEN
 	if (!g_screenPtr) { bOK = false; }
 
 	if (bOK)
@@ -137,14 +143,14 @@ int  sysInitialize() {
 	if (bOK)
 	{
 		CDevice *pTarget = g_deviceNameServicePtr->GetDevice(g_optionsPtr->GetLogDevice (), FALSE);
-		if (pTarget == 0)
-		{
+		if ((pTarget == 0) && g_screenPtr) {
 			pTarget = g_screenPtr;
-		}
 
-		bOK = g_loggerPtr->Initialize (pTarget);
-		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "device name service FAILED!\n"); }
+			bOK = g_loggerPtr->Initialize (pTarget);
+			if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "device name service FAILED!\n"); }
+		}
 	}
+#endif
 
 	if (bOK)
 	{
@@ -246,7 +252,9 @@ int  sysInitialize() {
 bool sysIsInitialized() { return isInitialized; }
 
 void sysDeinitialize() {
+#ifdef USE_SCREEN
     if (g_screenPtr) { delete g_screenPtr; }
+#endif
     isInitialized = false;
     return;
 }

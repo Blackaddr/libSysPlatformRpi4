@@ -89,6 +89,7 @@ Refactored for SPD0301 by Blackaddr Audio
 class Adafruit_SPD0301 : public Adafruit_GFX {
  public:
   Adafruit_SPD0301(int8_t DC, int8_t RST, int8_t CS);
+  virtual ~Adafruit_SPD0301();
 
   void begin(uint8_t switchvcc = SPD0301_SWITCHCAPVCC, bool reset=true);
   void SPD0301_command(uint8_t c);

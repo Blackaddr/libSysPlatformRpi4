@@ -42,9 +42,14 @@ SysDisplay::~SysDisplay()
     if (rawDisplayPtr) delete rawDisplayPtr;
 }
 
+unsigned SysDisplay::getHeight() { return SYS_DISPLAY_HEIGHT; }
+
+unsigned SysDisplay::getWidth() { return SYS_DISPLAY_WIDTH; }
+
 void SysDisplay::begin()
 {
     rawDisplayPtr->begin();
+    rawDisplayPtr->setTextWrap(false);
     //rawDisplayPtr->flipVertical(true);
 }
 
@@ -89,6 +94,17 @@ void SysDisplay::flipVertical(bool flip)
     rawDisplayPtr->flipVertical(flip);
 }
 
+int16_t SysDisplay::getCursorX()
+{
+    return rawDisplayPtr->getCursorX();
+}
+
+int16_t SysDisplay::getCursorY()
+{
+    return rawDisplayPtr->getCursorY();
+}
+
+
 int SysDisplay::printf(const char* str, const char *fmt, ...)
 {
     int result;
@@ -122,6 +138,15 @@ void SysDisplay::drawRect(int16_t x, int16_t y, int16_t w, int16_t h,
 {
     rawDisplayPtr->drawRect(x,y,w,h,color);
 }
+
+void SysDisplay::fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
+                    uint16_t color)
+{
+    if (color) { color = WHITE; }
+    else { color = BLACK; }
+    rawDisplayPtr->fillRect(x,y,w,h,color);
+}
+
 
 void SysDisplay::drawBitmap(int16_t x, int16_t y, const uint8_t *bitmap, int16_t w, int16_t h,
                 uint16_t color)

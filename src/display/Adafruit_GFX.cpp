@@ -1466,7 +1466,8 @@ void Adafruit_GFX::getTextBounds(const char *str, int16_t x, int16_t y,
 
   if (maxx >= minx) {     // If legit string bounds were found...
     *x1 = minx;           // Update x1 to least X coord,
-    *w = maxx - minx + 1; // And w to bound rect width
+    //*w = maxx - minx + 1; // And w to bound rect width
+    *w = maxx + 1;  // the above line gives inaccurate results when right-aligning text
   }
   if (maxy >= miny) { // Same for height
     *y1 = miny;
