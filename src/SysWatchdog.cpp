@@ -28,6 +28,11 @@ void SysWatchdog::begin(float seconds)
 
 }
 
+bool SysWatchdog::isStarted()
+{
+    return m_isStarted;
+}
+
 
 void SysWatchdog::feed()
 {

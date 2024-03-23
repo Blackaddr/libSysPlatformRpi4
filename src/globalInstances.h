@@ -41,8 +41,8 @@ extern CFATFileSystem* g_fileSystemPtr;
 extern CUSBHCIDevice*  g_usbHciPtr;
 extern CNetSubSystem*  g_netPtr;
 
-extern CSerialDevice* g_uart0Ptr;
-extern CSerialDevice* g_uart1Ptr;
+extern CSerialDevice* g_debugPtr;
+extern CSerialDevice* g_hdlcPtr;
 extern CSPIMaster*    g_spi0Ptr;
 
 }

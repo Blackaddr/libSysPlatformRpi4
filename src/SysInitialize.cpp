@@ -1,3 +1,4 @@
+#include "globalInstances.h"
 #include "sysPlatform/SysTypes.h"
 #include "sysPlatform/SysCpuControl.h"
 #include "sysPlatform/SysProgrammer.h"
@@ -7,7 +8,7 @@
 #include "sysPlatform/SysOTP.h"
 #include "sysPlatform/SysAudio.h"
 #include "sysPlatform/SysTimer.h"
-#include "globalInstances.h"
+#include "sysPlatform/SysIO.h"
 
 #include <circle/gpiopin.h>
 
@@ -79,10 +80,9 @@ CFATFileSystem* g_fileSystemPtr = nullptr;
 CUSBHCIDevice*  g_usbHciPtr     = nullptr;
 CNetSubSystem*  g_netPtr        = nullptr;
 
-CSerialDevice* g_uart0Ptr = nullptr;
-CSerialDevice* g_uart1Ptr = nullptr;
+CSerialDevice* g_debugPtr = nullptr;
+CSerialDevice* g_hdlcPtr  = nullptr;
 CSPIMaster*    g_spi0Ptr  = nullptr;
-
 
 static void __attribute__((unused)) enable_cycle_counter_el0(void)
 {
@@ -159,18 +159,18 @@ int  sysInitialize() {
 	}
 
 	if (bOK) {
-		g_uart0Ptr = new CSerialDevice(g_interruptSysPtr,  false, 0);  // GPIO 14/15 for TX/RX
-		g_uart1Ptr = new CSerialDevice(g_interruptSysPtr, false, 3);  // GPIO 4/5 for TX/RX
+		g_hdlcPtr  = new CSerialDevice(g_interruptSysPtr,  false, 0);  // GPIO 14/15 for TX/RX
+		g_debugPtr = new CSerialDevice(g_interruptSysPtr, false, 3);  // GPIO 4/5 for TX/RX
 
-		if (!g_uart0Ptr || !g_uart1Ptr) {
+		if (!g_debugPtr || !g_hdlcPtr) {
 			bOK = false;
 			g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "UART allocate FAILED!\n");
 		}
 
-		bOK = g_uart0Ptr->Initialize(UART_BAUD_RATE, 8, 1, CSerialDevice::ParityNone);
-		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "UART0 init FAILED!\n"); }
-		bOK = g_uart1Ptr->Initialize(UART_BAUD_RATE, 8, 1, CSerialDevice::ParityNone);
-		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "UART1 init FAILED!\n"); }
+		bOK = g_debugPtr->Initialize(UART_BAUD_RATE, 8, 1, CSerialDevice::ParityNone);
+		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "DEBUG serial init FAILED!\n"); }
+		bOK = g_hdlcPtr->Initialize(UART_BAUD_RATE, 8, 1, CSerialDevice::ParityNone);
+		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "HDLC serial init FAILED!\n"); }
 	}
 
 	if (bOK)
@@ -232,7 +232,14 @@ int  sysInitialize() {
 	if (bOK) {
 		if (SysOTP::begin() != SYS_SUCCESS) {
 			bOK = false;
-			g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogPanic, "Cannot initialize OTP\n");
+			g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogPanic, "Cannot initialize SysOTP\n");
+		}
+	}
+
+	if (bOK) {
+		if (sysIO.begin() != SYS_SUCCESS) {
+			bOK = false;
+			g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogPanic, "Cannot initialize SysIO)\n");
 		}
 	}
 
@@ -246,7 +253,19 @@ int  sysInitialize() {
         return SYS_FAILURE;
     }
 
-	SYS_DEBUG_PRINT(sysLogger.printf("*** SysPlatform::initialize() is complete\n"));
+	SYS_DEBUG_PRINT(sysLogger.printf("*** SysPlatform::initialize() is complete, success: %d\n", bOK));
+}
+
+void sysInitShowSummary()
+{
+	const u8* ipPtr =  g_netPtr->GetConfig()->GetIPAddress()->Get();
+	if (ipPtr) {
+		SYS_DEBUG_PRINT(sysLogger.printf("SYS INIT SUMMARY:\n\r"));
+		SYS_DEBUG_PRINT(sysLogger.begin(115200));
+		char ipAddressStr[32+1];
+		snprintf(ipAddressStr, 32, "IP Address: %u.%u.%u.%u", ipPtr[0], ipPtr[1], ipPtr[2], ipPtr[3]);
+		SYS_DEBUG_PRINT(sysLogger.printf("%s\n\r", ipAddressStr));
+	}
 }
 
 bool sysIsInitialized() { return isInitialized; }

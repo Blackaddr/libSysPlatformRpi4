@@ -65,7 +65,7 @@ int SysLogger::printf(const char *fmt, ...)
 	//g_loggerPtr->WriteRaw(msg);
 	size_t bytesRemaining = msg.GetLength();
 	const char* ptr = msg;
-	return g_uart0Ptr->Write(ptr, bytesRemaining);
+	return g_debugPtr->Write(ptr, bytesRemaining);
 }
 
 SysLogger::operator bool() const
@@ -75,7 +75,7 @@ SysLogger::operator bool() const
 
 void SysLogger::flush()
 {
-	if (g_uart0Ptr) { g_uart0Ptr->Flush(); }
+	if (g_debugPtr) { g_debugPtr->Flush(); }
 }
 
 }
