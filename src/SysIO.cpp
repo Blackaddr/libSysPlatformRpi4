@@ -51,7 +51,6 @@ void SysIO::_impl::m_processSwitch(HdlcPhysicalControlPkt& rxPkt)
     switch (rxPkt.controlAction) {
     case HdlcPhysicalControlActions::SW_PUSH_TRIGGER :
     {
-        sysLogger.printf("*** SW%d PUSHED ***\n", rxPkt.controlId);
         HdlcPhysicalControlPktRaw txPkt = makePhysicalControlPktRaw(
             HdlcPhysicalControlType::LED, HdlcPhysicalControlActions::LED_SET_VALUE, rxPkt.controlId, 1.0f);
             hdlcppPtr->write((uint8_t*)&txPkt, sizeof(txPkt));
@@ -59,7 +58,6 @@ void SysIO::_impl::m_processSwitch(HdlcPhysicalControlPkt& rxPkt)
     }
     case HdlcPhysicalControlActions::SW_RELEASE_TRIGGER :
     {
-        sysLogger.printf("*** SW%d RELEASED ***\n", rxPkt.controlId);
         HdlcPhysicalControlPktRaw txPkt = makePhysicalControlPktRaw(
             HdlcPhysicalControlType::LED, HdlcPhysicalControlActions::LED_SET_VALUE, rxPkt.controlId, 0.0f);
             hdlcppPtr->write((uint8_t*)&txPkt, sizeof(txPkt));
