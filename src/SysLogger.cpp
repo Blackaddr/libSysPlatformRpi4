@@ -62,8 +62,16 @@ int SysLogger::printf(const char *fmt, ...)
 	CString msg;
 	msg.FormatV(fmt, var);
 	va_end(var);
-	//g_loggerPtr->WriteRaw(msg);
 	size_t bytesRemaining = msg.GetLength();
+	const char* ptr = msg;
+	return g_debugPtr->Write(ptr, bytesRemaining);
+}
+
+int SysLogger::vprintf(const char * format, va_list arg)
+{
+	CString msg;
+	msg.FormatV(format, arg);
+    size_t bytesRemaining = msg.GetLength();
 	const char* ptr = msg;
 	return g_debugPtr->Write(ptr, bytesRemaining);
 }

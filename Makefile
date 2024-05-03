@@ -17,6 +17,7 @@ CPP_SRC_LIST += \
     SysAudioUsb \
     SysCpuControl \
     SysCpuTelemetry \
+    SysCrashReport \
     SysCrypto \
     SysDebugPrint \
     SysDisplay \
@@ -52,6 +53,7 @@ API_HEADER_LIST += \
     SysAudio \
     SysCpuControl \
     SysCpuTelemetry \
+    SysCrashReport \
     SysCrypto \
     SysDebugPrint \
     SysDisplay \
