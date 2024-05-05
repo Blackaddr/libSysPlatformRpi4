@@ -25,7 +25,9 @@ enum class HdlcPhysicalControlActions : uint8_t {
     SW_RELEASE_TRIGGER,
     SW_RAW_VALUE,
     LED_SET_VALUE,
-    LED_GET_VALUE
+    LED_GET_VALUE,
+    ENCODER_VALUE,
+    ANALOG_VALUE
 };
 
 
