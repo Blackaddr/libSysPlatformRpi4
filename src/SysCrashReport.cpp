@@ -10,8 +10,9 @@ bool SysCrashReport::m_enabled = true;
 
 size_t SysCrashReport::printReport() const
 {
-    if (!m_enabled) { return 0; }
-    if (!isSysDebugPrintEnabled()) { return 0; }
+    if (!m_enabled) { return SYS_SUCCESS; }
+    if (!isSysDebugPrintEnabled()) { return SYS_SUCCESS; }
+    return SYS_SUCCESS;
 }
 
 void SysCrashReport::disable()
@@ -48,7 +49,7 @@ void SysCrashReport::breadcrumbRaw(unsigned int num, unsigned int value)
 
 uint32_t SysCrashReport::getBreadcrumb(unsigned num)
 {
-
+    return 0;
 }
 
 uint32_t SysCrashReport::checksum(volatile const void *data, int len) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include "circle/interrupt.h"
 #include "circle/screen.h"
 #include "circle/logger.h"
@@ -19,6 +20,9 @@
 #include "circle/fs/fat/fatfs.h"  // for CFATFileSystem
 #include "circle/net/netsubsystem.h" // for CNetSubSystem
 #include "circle/usb/usbhcidevice.h"
+
+#include "sysPlatform/SysMutex.h"
+#include "Hdlcpp.hpp"
 
 #include "SPI.h"
 
@@ -44,5 +48,8 @@ extern CNetSubSystem*  g_netPtr;
 extern CSerialDevice* g_debugPtr;
 extern CSerialDevice* g_hdlcPtr;
 extern CSPIMaster*    g_spi0Ptr;
+
+extern std::mutex     g_hdlcMtx;
+extern std::shared_ptr<Hdlcpp::Hdlcpp> g_hdlcppPtr;
 
 }

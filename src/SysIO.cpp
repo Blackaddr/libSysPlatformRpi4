@@ -2,6 +2,7 @@
 #include "globalInstances.h"
 #include "sysPlatform/SysLogger.h"
 #include "sysPlatform/SysTypes.h"
+#include "sysPlatform/SysMidi.h"
 #include "SysIOMapping.h"
 #include "SysIO.h"
 
@@ -30,30 +31,18 @@ volatile static int      g_potValues[AVALON_NUM_POTS]         = {0,0,0,0};
 // SysIO
 //////////
 SysIO sysIO;
-constexpr size_t HDLC_READ_BUFFER_SIZE = 2048;
 
-static std::shared_ptr<Hdlcpp::Hdlcpp> g_hdlcppPtr = nullptr;
+constexpr size_t HDLC_READ_BUFFER_SIZE = 2048;
 
 struct SysIO::_impl {
     uint8_t* readBuffer = nullptr;
 
-    void m_processHdlcPkt(HdlcPhysicalControlPkt& pkt);
     void m_processPhysicalControl(HdlcPhysicalControlPkt& pkt);
     void m_processSwitch(HdlcPhysicalControlPkt& pkt);
     void m_processEncoder(HdlcPhysicalControlPkt& pkt);
     void m_processAnalog(HdlcPhysicalControlPkt& pkt);
+    void m_processMidiMsg(HdlcMidiMsgPkt& pkt);
 };
-
-// Process incoming HDLC Packet
-void SysIO::_impl::m_processHdlcPkt(HdlcPhysicalControlPkt& pkt)
-{
-    switch (pkt.msgType) {
-    case HdlcMessageType::PHYSICAL_CONTROL : return m_processPhysicalControl(pkt);
-    default :
-        sysLogger.printf("SysIO::_impl::m_processHdlcPkt(): invalid packet type:%u\n", pkt.msgType);
-        break;
-    }
-}
 
 // Processing incomding Physical Control HDLC packet
 void SysIO::_impl::m_processPhysicalControl(HdlcPhysicalControlPkt& pkt)
@@ -121,6 +110,20 @@ void SysIO::_impl::m_processAnalog(HdlcPhysicalControlPkt& rxPkt)
     }
 }
 
+void SysIO::_impl::m_processMidiMsg(HdlcMidiMsgPkt& pkt)
+{
+#if defined(PROCESS_USB_MIDI)
+    //sysLogger.printf("SysIO::_impl::m_processMidiMsg(): channel:%02X  data0:%02X  data1:%u  data2:%02X\n",
+    //    pkt.channel, pkt.data0, pkt.data1, pkt.data2);
+    uint8_t msg[4];
+    msg[0] = 0; // cable
+    msg[1] = pkt.data0;
+    msg[2] = pkt.data1;
+    msg[3] = pkt.data2;
+    sysUsbMidi.putMsg(msg);
+#endif
+}
+
 SysIO::SysIO()
 : m_pimpl(std::make_unique<_impl>())
 {
@@ -139,18 +142,6 @@ int SysIO::begin()
     m_pimpl->readBuffer = (uint8_t*)malloc(HDLC_READ_BUFFER_SIZE * sizeof(uint8_t));
     if (!m_pimpl->readBuffer) { sysLogger.printf("SysIO::begin(): Error creating Hdlcpp\n\r"); return SYS_FAILURE; }
 
-    g_hdlcppPtr = std::make_shared<Hdlcpp::Hdlcpp>(
-    [&](uint8_t *data, uint16_t length) {
-            if (!g_hdlcPtr) { return 0; }
-            return g_hdlcPtr->Read(data, length);
-      },
-    [&](const uint8_t *data, uint16_t length) {
-            if (!g_hdlcPtr) { return 0; }
-            return g_hdlcPtr->Write(data, length);
-    }, HDLC_READ_BUFFER_SIZE, 0 /* timeout in ms */, 0 /* retries */);
-
-    if (!g_hdlcppPtr) { sysLogger.printf("SysIO::begin(): Error creating Hdlcpp\n\r"); return SYS_FAILURE; }
-
     m_isInitialized = true;
     return SYS_SUCCESS;
 }
@@ -162,10 +153,31 @@ bool SysIO::scanInputs()
     if (!g_hdlcPtr) { return 0; }
     if (!g_debugPtr) { return 0; }
 
-    int bytesRead = g_hdlcppPtr->read(m_pimpl->readBuffer, HDLC_READ_BUFFER_SIZE);
+    int bytesRead = 0;
+    {
+        std::lock_guard<std::mutex> lock(g_hdlcMtx);
+        bytesRead = g_hdlcppPtr->read(m_pimpl->readBuffer, HDLC_READ_BUFFER_SIZE);
+    }
     if (bytesRead > 0) {
-        HdlcPhysicalControlPkt pkt = decodePhysicalControlPkt(m_pimpl->readBuffer, bytesRead);
-        m_pimpl->m_processHdlcPkt(pkt);
+        HdlcMessageType type = static_cast<HdlcMessageType>(m_pimpl->readBuffer[0]);  // type is the first byte
+        switch(type) {
+        case HdlcMessageType::PHYSICAL_CONTROL :
+        {
+            HdlcPhysicalControlPkt pkt = decodePhysicalControlPkt(m_pimpl->readBuffer, bytesRead);
+            m_pimpl->m_processPhysicalControl(pkt);
+            break;
+        }
+        case HdlcMessageType::MIDI_MSG :
+        {
+            HdlcMidiMsgPkt pkt = decodeMidiMsgPkt(m_pimpl->readBuffer, bytesRead);
+            m_pimpl->m_processMidiMsg(pkt);
+            break;
+        }
+        default:
+            SYS_DEBUG_PRINT(sysLogger.printf("SysIO::scanInputs(): invalid HDLC message received:%u\n", static_cast<unsigned>(type)));
+            break;
+        }
+
         return true;
     }
     else if (bytesRead < 0) {
@@ -325,7 +337,10 @@ void SysOutput::setValue(bool value)
     if (!g_hdlcppPtr) { return; }
     HdlcPhysicalControlPktRaw txPkt = makePhysicalControlPktRaw(
         HdlcPhysicalControlType::LED, HdlcPhysicalControlActions::LED_SET_VALUE, m_mappedId, value);
-        g_hdlcppPtr->write((uint8_t*)&txPkt, sizeof(txPkt));
+        {
+            std::lock_guard<std::mutex> lock(g_hdlcMtx);
+            g_hdlcppPtr->write((uint8_t*)&txPkt, sizeof(txPkt));
+        }
 }
 
 ////////////////////

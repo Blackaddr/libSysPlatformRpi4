@@ -68,4 +68,9 @@ void SysCpuControl::shutdownUsb()
 
 }
 
+void SysCpuControl::disableWdt()
+{
+
+}
+
 }

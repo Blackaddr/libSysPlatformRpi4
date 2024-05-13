@@ -41,12 +41,20 @@ uint64_t SysTimer::cycleCnt64()
 
 void SysTimer::delayMilliseconds(unsigned x)
 {
-    CScheduler* ptr = CScheduler::Get(); if (ptr) { ptr->MsSleep(x); }
+    CScheduler* ptr = CScheduler::Get();
+	if (ptr) {
+		ptr->Yield();
+		ptr->MsSleep(x);
+	}
 }
 
 void SysTimer::delayMicroseconds(unsigned x)
 {
-    CScheduler* ptr = CScheduler::Get(); if (ptr) { ptr->usSleep(x); }
+    CScheduler* ptr = CScheduler::Get();
+	if (ptr) {
+		ptr->Yield();
+		ptr->usSleep(x);
+	}
 }
 
 // CPU cycle counts since program start

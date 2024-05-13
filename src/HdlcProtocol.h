@@ -1,10 +1,17 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef> // for size_t
+#include <cstring> // for memcpy
+#include "Hdlcpp.hpp"
+
+int transportRead(uint8_t *data, uint16_t length);
+int transportWrite(const uint8_t *data, uint16_t length);
 
 enum class HdlcMessageType : uint8_t {
     INVALID = 0,
     PHYSICAL_CONTROL,
+    MIDI_MSG,
     NUM_MESSAGE_TYPES
 };
 
@@ -50,31 +57,37 @@ struct HdlcPhysicalControlPkt {
 
 // Switch Processing
 HdlcPhysicalControlPktRaw makePhysicalControlPktRaw(
-    HdlcPhysicalControlType controlType, HdlcPhysicalControlActions controlAction, unsigned controlId, float controlValue)
-{
-  HdlcPhysicalControlPktRaw pkt;
-  pkt.msgType       = static_cast<uint8_t>(HdlcMessageType::PHYSICAL_CONTROL);
-  pkt.controlType   = static_cast<uint8_t>(controlType);
-  pkt.controlAction = static_cast<uint8_t>(controlAction);
-  pkt.controlId     = static_cast<uint8_t>(controlId);
-  pkt.controlValue  = controlValue;
+    HdlcPhysicalControlType controlType, HdlcPhysicalControlActions controlAction, unsigned controlId, float controlValue);
 
-  return pkt;
-}
+HdlcPhysicalControlPkt decodePhysicalControlPkt(uint8_t* buf, size_t bufferSize);
 
-HdlcPhysicalControlPkt decodePhysicalControlPkt(uint8_t* buf, size_t bufferSize)
-{
-  // Create a pkt initalized to invalid
-  HdlcPhysicalControlPkt pkt = {HdlcMessageType::INVALID, HdlcPhysicalControlType::INVALID,
-                       HdlcPhysicalControlActions::INVALID, 0};
-  if (bufferSize < sizeof(HdlcPhysicalControlPktRaw)) { return pkt; }
+// MIDI Processing
+// From usb.org MIDI 1.0 specification. This 4 byte structure is the unit
+// of transfer for MIDI data over USB.
+typedef struct __attribute__((__packed__)) {
+  uint8_t code_index_number : 4;
+  uint8_t cable_number : 4;
+  uint8_t MIDI_0;
+  uint8_t MIDI_1;
+  uint8_t MIDI_2;
+} UsbMidiMessage;
 
-  pkt.msgType       = static_cast<HdlcMessageType>(buf[0]);
-  pkt.controlType   = static_cast<HdlcPhysicalControlType>(buf[1]);
-  pkt.controlAction = static_cast<HdlcPhysicalControlActions>(buf[2]);
-  pkt.controlId     = static_cast<uint8_t>(buf[3]);
-  memcpy(&pkt.controlValue, &buf[4], sizeof(float));
+struct HdlcMidiMsgPkt {
+    HdlcMessageType msgType;
+    uint8_t         cable;
+    uint8_t         data0;
+    uint8_t         data1;
+    uint8_t         data2;
+};
 
-  return pkt;
-}
+struct HdlcMidiMsgPktRaw {
+    uint8_t msgType;
+    uint8_t cable;
+    uint8_t data0;
+    uint8_t data1;
+    uint8_t data2;
+};
 
+HdlcMidiMsgPktRaw makeMidiMsgPktRaw(unsigned cable, unsigned data0, unsigned data1, unsigned data2);
+
+HdlcMidiMsgPkt decodeMidiMsgPkt(uint8_t* buf, size_t bufferSize);

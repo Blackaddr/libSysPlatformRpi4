@@ -40,7 +40,8 @@ CPP_SRC_LIST += \
     Adafruit_GFX \
     Adafruit_SPD0301 \
     ArduinoApi \
-    SPI
+    SPI \
+    HdlcProtocol
 
 
 S_SRC_LIST =

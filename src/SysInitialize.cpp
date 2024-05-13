@@ -1,4 +1,5 @@
 #include "globalInstances.h"
+#include "HdlcProtocol.h"
 #include "sysPlatform/SysTypes.h"
 #include "sysPlatform/SysCpuControl.h"
 #include "sysPlatform/SysProgrammer.h"
@@ -84,6 +85,22 @@ CSerialDevice* g_debugPtr = nullptr;
 CSerialDevice* g_hdlcPtr  = nullptr;
 CSPIMaster*    g_spi0Ptr  = nullptr;
 
+constexpr size_t HDLC_READ_BUFFER_SIZE = 2048;
+std::mutex     g_hdlcMtx;
+std::shared_ptr<Hdlcpp::Hdlcpp> g_hdlcppPtr = nullptr;
+static int hdlcTransportRead(uint8_t *data, uint16_t length)
+{
+  if (!g_hdlcPtr) { return 0; }
+  return g_hdlcPtr->Read(data, length);
+}
+
+static int hdlcTransportWrite(const uint8_t *data, uint16_t length)
+{
+  if (!g_hdlcPtr) { return 0; }
+  g_hdlcPtr->Write(data, length);
+  return length;
+}
+
 static void __attribute__((unused)) enable_cycle_counter_el0(void)
 {
 	uint64_t val;
@@ -159,6 +176,7 @@ int  sysInitialize() {
 	}
 
 	if (bOK) {
+		std::lock_guard<std::mutex> lock(g_hdlcMtx);
 		g_hdlcPtr  = new CSerialDevice(g_interruptSysPtr,  false, 0);  // GPIO 14/15 for TX/RX
 		g_debugPtr = new CSerialDevice(g_interruptSysPtr, false, 3);  // GPIO 4/5 for TX/RX
 
@@ -171,7 +189,11 @@ int  sysInitialize() {
 		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "DEBUG serial init FAILED!\n"); }
 		bOK = g_hdlcPtr->Initialize(UART_BAUD_RATE, 8, 1, CSerialDevice::ParityNone);
 		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "HDLC serial init FAILED!\n"); }
-	}
+
+		// Initialize the HDLCpp
+		g_hdlcppPtr = std::make_shared<Hdlcpp::Hdlcpp>(
+		    hdlcTransportRead, hdlcTransportWrite, HDLC_READ_BUFFER_SIZE, 0 /* timeout in ms */, 0 /* retries */);
+		}
 
 	if (bOK)
 	{
