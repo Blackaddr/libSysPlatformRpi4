@@ -73,4 +73,9 @@ void SysCpuControl::disableWdt()
 
 }
 
+void SysCpuControl::enableWdt()
+{
+
+}
+
 }

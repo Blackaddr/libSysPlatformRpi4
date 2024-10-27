@@ -21,6 +21,12 @@ void SysCrashReport::disable()
     m_enabled = false;
 }
 
+void SysCrashReport::enable()
+{
+    m_enabled = true;
+    reset();
+}
+
 void SysCrashReport::reset()
 {
     clear();

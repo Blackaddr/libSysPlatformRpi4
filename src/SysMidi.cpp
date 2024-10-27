@@ -59,6 +59,11 @@ size_t   SysSerialMidi::getSysExArrayLength()
     return 0;
 }
 
+uint8_t  SysSerialMidi::getChannel()
+{
+    return 0;
+}
+
 uint8_t  SysSerialMidi::getData1()
 {
     return 0;
@@ -75,6 +80,11 @@ void SysSerialMidi::sendSysEx(size_t sysExDataLength, uint8_t* sysExData)
 }
 
 void SysSerialMidi::sendProgramChange(unsigned program, unsigned channel)
+{
+
+}
+
+void SysSerialMidi::sendMidiMessage(uint8_t type, uint8_t channel, uint8_t data1, uint8_t data2)
 {
 
 }
@@ -256,6 +266,11 @@ size_t   SysUsbMidi::getSysExArrayLength()
     return length;
 }
 
+uint8_t  SysUsbMidi::getChannel()
+{
+    return (m_pimpl->currentMsg.MIDI_0 & 0x0FU);  // channel is lower 4 bits
+}
+
 uint8_t  SysUsbMidi::getData1()
 {
     return m_pimpl->currentMsg.MIDI_1;
@@ -312,6 +327,11 @@ void SysUsbMidi::sendSysEx(size_t sysExDataLength, uint8_t* sysExData)
 }
 
 void SysUsbMidi::sendProgramChange(unsigned program, unsigned channel)
+{
+
+}
+
+void SysUsbMidi::sendMidiMessage(uint8_t type, uint8_t channel, uint8_t data1, uint8_t data2)
 {
 
 }

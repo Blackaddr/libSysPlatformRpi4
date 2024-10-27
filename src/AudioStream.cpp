@@ -32,6 +32,8 @@
 #include "sysPlatform/SysTypes.h"
 #include "sysPlatform/SysCpuControl.h"
 #include "sysPlatform/SysTimer.h"
+#include "sysPlatform/SysWatchdog.h"
+#include "sysPlatform/SysCrashReport.h"
 #include "sysPlatform/SysLogger.h"
 #include "AudioStream.h"
 
@@ -47,11 +49,12 @@ using namespace SysPlatform;
 
 extern const unsigned AUDIO_SAMPLES_PER_BLOCK = AUDIO_BLOCK_SAMPLES;
 extern const float    AUDIO_SAMPLE_RATE_HZ    = AUDIO_SAMPLE_RATE_EXACT;
+extern const float    AUDIO_SAMPLE_PERIOD_SEC = AUDIO_SAMPLE_PERIOD_SEC_F;
 
-//std::atomic<bool>  audio_traversal_lock(false);
+std::atomic<bool> audioIsrInProgress(false);
 volatile int8_t audio_traversal_array[MAX_TRAVERSAL_BYTES];
 
-audio_block_t * AudioStream::memory_pool;
+audio_block_float32_t * AudioStream::memory_pool;
 uint32_t AudioStream::memory_pool_available_mask[NUM_MASKS];
 uint16_t AudioStream::memory_pool_first_mask;
 
@@ -59,6 +62,7 @@ uint16_t AudioStream::cpu_cycles_total = 0;
 uint16_t AudioStream::cpu_cycles_total_max = 0;
 uint16_t AudioStream::memory_used = 0;
 uint16_t AudioStream::memory_used_max = 0;
+uint16_t AudioStream::num_buffers = 0;
 AudioConnection* AudioStream::unused = NULL; // linked list of unused but not destructed connections
 
 bool AudioStream::use_ordered_update = false;
@@ -70,14 +74,15 @@ void software_isr(void);
 
 // Set up the pool of audio data blocks
 // placing them all onto the free list
-FLASHMEM void AudioStream::initialize_memory(audio_block_t *data, unsigned int num, int16_t *dataBuffers)
+FLASHMEM void AudioStream::initialize_memory(audio_block_float32_t *data, unsigned int num, float *dataBuffers)
 {
 	unsigned int i;
-	unsigned int maxnum = MAX_AUDIO_MEMORY / AUDIO_BLOCK_SAMPLES / 2;
+	unsigned int maxnum = MAX_AUDIO_MEMORY / AUDIO_BLOCK_SAMPLES / sizeof(float);
 
 	//Serial.println("AudioStream initialize_memory");
 	//delay(10);
 	if (num > maxnum) num = maxnum;
+	num_buffers = num;
 	SysCpuControl::disableIrqs();
 	memory_pool = data;
 	memory_pool_first_mask = 0;
@@ -93,6 +98,9 @@ FLASHMEM void AudioStream::initialize_memory(audio_block_t *data, unsigned int n
 			data[i].data = dataBuffers + i*AUDIO_BLOCK_SAMPLES;
 		}
 	}
+
+	AudioMemoryUsageMaxReset();
+#if 0 // disable timer support. For Multiverse, we will always use i2sIn interrupt timing.
 	if (update_scheduled == false) {
 		// if no hardware I/O has taken responsibility for update,
 		// start a timer which will call update_all() at the correct rate
@@ -103,6 +111,7 @@ FLASHMEM void AudioStream::initialize_memory(audio_block_t *data, unsigned int n
 			update_setup();
 		}
 	}
+#endif
     std::memset((void*)audio_traversal_array, 255, MAX_TRAVERSAL_BYTES);  // initialize to -1
 	SysCpuControl::enableIrqs();
 }
@@ -111,9 +120,16 @@ FLASHMEM void AudioStream::initialize_memory(audio_block_t *data, unsigned int n
 // the caller is the only owner of this new block
 audio_block_t * AudioStream::allocate(void)
 {
+	audio_block_t* block = (audio_block_t*)allocateFloat();
+	block->flags = 0;
+	return block;
+}
+
+audio_block_float32_t * AudioStream::allocateFloat(void)
+{
 	uint32_t n, index, avail;
 	uint32_t *p, *end;
-	audio_block_t *block;
+	audio_block_float32_t *block;
 	uint32_t used;
 
 	p = memory_pool_available_mask;
@@ -121,10 +137,12 @@ audio_block_t * AudioStream::allocate(void)
 	SysCpuControl::disableIrqs();
 	index = memory_pool_first_mask;
 	p += index;
+	// calculate the number of free masks
 	while (1) {
 		if (p >= end) {
 			SysCpuControl::enableIrqs();
-			//Serial.println("alloc:null");
+			SYS_DEBUG_PRINT(sysLogger.printf("AudioStream::allocateFloat(): FAILURE!!! NUM_MASKS=%d  memory_pool_first_mask=%d  index=%d\n",
+			    NUM_MASKS, memory_pool_first_mask, index));
 			return NULL;
 		}
 		avail = *p;
@@ -141,11 +159,14 @@ audio_block_t * AudioStream::allocate(void)
 	memory_used = used;
 	SysCpuControl::enableIrqs();
 	index = p - memory_pool_available_mask;
+	//audio_block_float32_t* blockInit = memory_pool + ((index << 5) + (31 - n));
+	//block = (audio_block_t*)blockInit;.
 	block = memory_pool + ((index << 5) + (31 - n));
 	block->ref_count = 1;
 	if (used > memory_used_max) memory_used_max = used;
 	//Serial.print("alloc:");
 	//Serial.println((uint32_t)block, HEX);
+	block->flags = FLOAT_MASK;
 	return block;
 }
 
@@ -154,21 +175,57 @@ audio_block_t * AudioStream::allocate(void)
 // returned to the free pool
 void AudioStream::release(audio_block_t *block)
 {
-	//if (block == NULL) return;
+	return release((audio_block_float32_t*)block);
+}
+
+void AudioStream::release(audio_block_t** block)
+{
+	return release((audio_block_float32_t**)block);
+}
+
+void AudioStream::release(audio_block_float32_t *block)
+{
+	if (block == nullptr) return;
 	uint32_t mask = (0x80000000 >> (31 - (block->memory_pool_index & 0x1F)));
 	uint32_t index = block->memory_pool_index >> 5;
 
 	SysCpuControl::disableIrqs();
 	if (block->ref_count > 1) {
 		block->ref_count--;
-	} else {
+	} else if (block->ref_count == 1) {
 		//Serial.print("reles:");
 		//Serial.println((uint32_t)block, HEX);
 		memory_pool_available_mask[index] |= mask;
 		if (index < memory_pool_first_mask) memory_pool_first_mask = index;
-		memory_used--;
+		if (memory_used == 0) {
+			SYS_DEBUG_PRINT(sysLogger.printf("AudioStream::release(): WARNING: release() called when memory_used:%d\n", memory_used));
+		} else {
+			memory_used--;
+		}
 	}
 	SysCpuControl::enableIrqs();
+}
+
+void AudioStream::release(audio_block_float32_t** block)
+{
+	if (!block) { return; }
+	if (*block) { release(*block); *block = nullptr; }
+}
+
+void AudioStream::releaseAll()
+{
+	memory_pool_first_mask = 0;
+	for (unsigned i=0; i < NUM_MASKS; i++) {
+		memory_pool_available_mask[i] = 0;
+	}
+	for (unsigned i=0; i < num_buffers; i++) {
+		memory_pool_available_mask[i >> 5] |= (1 << (i & 0x1F));
+	}
+	for (unsigned i=0; i < num_buffers; i++) {
+		memory_pool[i].ref_count = 0;
+		memory_pool[i].flags = 0;
+	};
+	memory_used = 0;
 }
 
 // Transmit an audio data block
@@ -179,6 +236,11 @@ void AudioStream::release(audio_block_t *block)
 // caller to transmit to same block to more than 1 output,
 // and then release it once after all transmit calls.
 void AudioStream::transmit(audio_block_t *block, unsigned char index)
+{
+	return transmit((audio_block_float32_t*)block, index);
+}
+
+void AudioStream::transmit(audio_block_float32_t *block, unsigned char index)
 {
 	for (AudioConnection *c = destination_list; c != NULL; c = c->next_dest) {
 		if (c->src_index == index) {
@@ -195,7 +257,11 @@ void AudioStream::transmit(audio_block_t *block, unsigned char index)
 // may be shared with other streams, so it must not be written
 audio_block_t * AudioStream::receiveReadOnly(unsigned int index)
 {
-	audio_block_t *in;
+	return ((audio_block_t*)receiveReadOnlyFloat(index));
+}
+audio_block_float32_t * AudioStream::receiveReadOnlyFloat(unsigned int index)
+{
+	audio_block_float32_t *in;
 
 	if (index >= num_inputs) return NULL;
 	in = inputQueue[index];
@@ -207,14 +273,30 @@ audio_block_t * AudioStream::receiveReadOnly(unsigned int index)
 // be shared, so its contents may be changed.
 audio_block_t * AudioStream::receiveWritable(unsigned int index)
 {
-	audio_block_t *in, *p;
+	audio_block_float32_t *in, *p;
 
 	if (index >= num_inputs) return NULL;
 	in = inputQueue[index];
 	inputQueue[index] = NULL;
 	if (in && in->ref_count > 1) {
-		p = allocate();
+		p = (audio_block_float32_t*)allocate();
 		if (p) memcpy(p->data, in->data, sizeof(int16_t) * AUDIO_BLOCK_SAMPLES);
+		in->ref_count--;
+		in = p;
+	}
+	return (audio_block_t*)in;
+}
+
+audio_block_float32_t * AudioStream::receiveWritableFloat(unsigned int index)
+{
+	audio_block_float32_t *in, *p;
+
+	if (index >= num_inputs) return NULL;
+	in = inputQueue[index];
+	inputQueue[index] = NULL;
+	if (in && in->ref_count > 1) {
+		p = (audio_block_float32_t*)allocateFloat();
+		if (p) memcpy(p->data, in->data, sizeof(float) * AUDIO_BLOCK_SAMPLES);
 		in->ref_count--;
 		in = p;
 	}
@@ -413,7 +495,7 @@ int AudioConnection::disconnect(void)
 //>>> PAH release the audio buffer properly
 	//Remove possible pending src block from destination
 	if(dst->inputQueue[dest_index] != NULL) {
-		AudioStream::release(dst->inputQueue[dest_index]);
+		AudioStream::release((audio_block_t*)dst->inputQueue[dest_index]);
 		// release() re-enables the IRQ. Need it to be disabled a little longer
 		SysCpuControl::disableIrqs();
 		dst->inputQueue[dest_index] = NULL;
@@ -463,8 +545,8 @@ void AudioStream::update_stop(void)
 	update_scheduled = false;
 }
 
-void AudioStream::update_all(void) {	
-	software_isr();  //SysCpuControl::AudioTriggerInterrupt();
+void AudioStream::update_all(void) {
+	SysCpuControl::AudioTriggerInterrupt();
 }
 
 void AudioStream::setOrderedUpdate(bool orderedUpdate) {
@@ -479,7 +561,7 @@ void AudioStream::setOrderedUpdate(bool orderedUpdate) {
 
 	ordered_update_array = (AudioStream**)malloc(num_objects * sizeof(AudioStream*));
 	if (!ordered_update_array) {
-		//if (Serial) { Serial.printf("AudioStream::setOrderedUpdate(): unable to allocate array\n\r"); Serial.flush(); }
+		//if (Serial) { Serial.printf("AudioStream::setOrderedUpdate(): unable to allocate array\n"); Serial.flush(); }
 		return;
 	}
 
@@ -489,7 +571,7 @@ void AudioStream::setOrderedUpdate(bool orderedUpdate) {
 	unsigned loopLimit = 100;
 	while ((objects_remaining > 0) && (loopLimit-- > 0)) {
 		for (p = AudioStream::first_update; p; p = p->next_update) {
-			//if (Serial) { Serial.printf("setOrderedUpdate(): scanning object %d, looking for %d, objects remaining: %d\n\r", p->id, idx, objects_remaining); Serial.flush(); }
+			//if (Serial) { Serial.printf("setOrderedUpdate(): scanning object %d, looking for %d, objects remaining: %d\n", p->id, idx, objects_remaining); Serial.flush(); }
 			if ((p->id == UPDATE_STEP_OBJECT_ID) && (!step_update_object)) {
 				step_update_object = p;
 				objects_remaining--;
@@ -501,20 +583,20 @@ void AudioStream::setOrderedUpdate(bool orderedUpdate) {
 		}
 	}
 	if ((!step_update_object) || (loopLimit == 0)) {
-		//if (Serial && !step_update_object) { Serial.printf("ERROR: step_update_object is not valid\n\r"); }
-		//if (Serial && (loopLimit == 0)) { Serial.printf("ERROR: step_update_object is not valid\n\r"); }
+		//if (Serial && !step_update_object) { Serial.printf("ERROR: step_update_object is not valid\n"); }
+		//if (Serial && (loopLimit == 0)) { Serial.printf("ERROR: step_update_object is not valid\n"); }
 		orderedUpdate = false;
 	}
 	ordered_update_array[idx] = nullptr; // terminate the list
 
 	// if (Serial) {
-	// 	Serial.printf("\n*** AUDIOSTREAM ARRAY\n\r");
+	// 	Serial.printf("\n*** AUDIOSTREAM ARRAY\n");
 	// 	for (int i=0; i < num_objects; i++) {
 	// 		if (ordered_update_array[i]) {
-	// 			Serial.printf("idx:%d  id:%d  Addr:0x%08X\n\r", i, ordered_update_array[i]->id, ordered_update_array[i]);
-	// 		} else { Serial.printf("idx:%d  Addr:0x%08X\n\r", i, ordered_update_array[i]);}
+	// 			Serial.printf("idx:%d  id:%d  Addr:0x%08X\n", i, ordered_update_array[i]->id, ordered_update_array[i]);
+	// 		} else { Serial.printf("idx:%d  Addr:0x%08X\n", i, ordered_update_array[i]);}
 	// 	}
-	// 	Serial.printf("\n\rNum objects:%d  StepObject:%d\n\r", idx, step_update_object ? true : false);
+	// 	Serial.printf("\nNum objects:%d  StepObject:%d\n", idx, step_update_object ? true : false);
 	// }
 }
 
@@ -524,7 +606,7 @@ void software_isr(void) // AudioStream::update_all()
 {
 	AudioStream *p;
 
-	uint32_t totalcycles = SysTimer::cycleCnt32(); 
+	uint32_t totalcycles = SysTimer::cycleCnt32();
 	//digitalWriteFast(2, HIGH);
 
     if (AudioStream::use_ordered_update) {
@@ -539,9 +621,8 @@ void software_isr(void) // AudioStream::update_all()
 		unsigned idx = 0;
 		unsigned loopLimit = 50;
 
-        //if (Serial) { Serial.printf("-\n\r"); }
-        //if (Serial && audio_traversal_lock) { Serial.printf("isr collision\n\r"); }
-        //audio_traversal_lock = true;
+        //if (Serial) { Serial.printf("-\n"); }
+		audioIsrInProgress = true;
         while(loopLimit-- > 0) {
 
 			int8_t stepIndex  = audio_traversal_array[idx];
@@ -551,7 +632,7 @@ void software_isr(void) // AudioStream::update_all()
 
 			if ( ((stepIndex) >= 0) && AudioStream::step_update_object) {  // run the update step object first
 			    p = AudioStream::step_update_object;
-				//Serial.printf("Step:%d id:%d addr:%08X\n\r", stepIndex, objectId, p);
+				//Serial.printf("Step:%d id:%d addr:%08X\n", stepIndex, objectId, p);
 				if (p->active) {
 					uint32_t cycles = SysTimer::cycleCnt32();
 					p->updateIndex(stepIndex);
@@ -562,31 +643,33 @@ void software_isr(void) // AudioStream::update_all()
 			} else {  // run the update on the AudioStream ID object
 				if (objectId >= 0) {
 					p = AudioStream::ordered_update_array[objectId];
-					//Serial.printf("id:%d addr:%08X\n\r", objectId, p);
+					//Serial.printf("id:%d addr:%08X\n", objectId, p);
 					if (!p) {
-						//if (Serial) { Serial.printf("software_isr(): null AudioStream object encountered\n\r"); }
+						//if (Serial) { Serial.printf("software_isr(): null AudioStream object encountered\n"); }
 						continue;
 					}
 					if (p->active) {
+						sysCrashReport.setBreadcrumb(SysCrashReport::AUDIO_EFFECT_UPDATE_ID, SysCrashReport::START_MASK, (uint32_t)(p->getId()));
 						uint32_t cycles = SysTimer::cycleCnt32();
 						p->update();
 						cycles = (SysTimer::cycleCnt32() - cycles) >> 6;
 						p->cpu_cycles = cycles;
 						if (cycles > p->cpu_cycles_max) p->cpu_cycles_max = cycles;
+						sysCrashReport.setBreadcrumb(SysCrashReport::AUDIO_EFFECT_UPDATE_ID, SysCrashReport::DONE_MASK, (uint32_t)(p->getId()));
 					}
 				}
 			}
 		}
-		//if (loopLimit == 0) { if (Serial) { Serial.printf("software_isr(): loop limit reached\n\r"); } }
-		//Serial.printf("Loop limit %d\n\r", loopLimit);
+		//if (loopLimit == 0) { if (Serial) { Serial.printf("software_isr(): loop limit reached\n"); } }
+		//Serial.printf("Loop limit %d\n", loopLimit);
 
 		// reset and release step_update input buffers
 		if (AudioStream::step_update_object) { AudioStream::step_update_object->updateIndex(-1); }
-		//audio_traversal_lock = false;
+		audioIsrInProgress = false;
 
 	} else {  // original processing by PJRC
 		for (p = AudioStream::first_update; p; p = p->next_update) {
-			//Serial.printf("addr:%08X\n\r", p);
+			//Serial.printf("addr:%08X\n", p);
 			if (p->active) {
 				uint32_t cycles = SysTimer::cycleCnt32();
 				p->update();
@@ -604,5 +687,10 @@ void software_isr(void) // AudioStream::update_all()
 	if (totalcycles > AudioStream::cpu_cycles_total_max)
 		AudioStream::cpu_cycles_total_max = totalcycles;
 
+	if (SysPlatform::sysWatchdog.isStarted()) {
+		SysPlatform::sysWatchdog.feed();
+	}
+
 	SysCpuControl::SysDataSyncBarrier();
 }
+
