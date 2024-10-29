@@ -29,7 +29,10 @@ static void createSoundDevice()
     if (!m_soundDevPtr) {
         m_soundDevPtr = new CI2SSoundBaseDevice (g_interruptSysPtr, AUDIO_SAMPLE_RATE_HZ, 2*AUDIO_SAMPLES_PER_BLOCK, TRUE /* RPI is slave*/,
 						g_i2cMasterPtr, 0, CI2SSoundBaseDevice::DeviceModeTXRX);
-        assert (m_soundDevPtr != 0);
+        if (!m_soundDevPtr) {
+            SYS_DEBUG_PRINT(sysLogger.printf("SysAudio:createSoundDevice(): Cannot create CI2SSoundBaseDevice\n"));
+            return;
+        }
     }
 
     m_soundDevPtr->RegisterSecondaryRxHandler(rxIsr, nullptr);
@@ -41,11 +44,15 @@ static void createSoundDevice()
     {
         //LogScreen("Cannot allocate sound queue\n");
         g_loggerPtr->Write("SysAudio:createSoundDevice", TLogSeverity::LogError, "Cannot allocate sound queue\n");
+        SYS_DEBUG_PRINT(sysLogger.printf("SysAudio:createSoundDevice(): Cannot allocate sound queue\n"));
+        return;
     }
     if (!m_soundDevPtr->AllocateReadQueue (QUEUE_SIZE_MSECS))
     {
         //LogScreen("Cannot allocate input sound queue\n");
         g_loggerPtr->Write("SysAudio:createSoundDevice", TLogSeverity::LogError, "Cannot allocate read queue\n");
+        SYS_DEBUG_PRINT(sysLogger.printf("SysAudio:createSoundDevice(): Cannot allocate read queue\n"));
+        return;
     }
     m_soundDevPtr->SetWriteFormat (FORMAT, WRITE_CHANNELS);
     m_soundDevPtr->SetReadFormat (FORMAT, WRITE_CHANNELS);
@@ -55,9 +62,11 @@ static void createSoundDevice()
     {
         //LogScreen("Cannot start sound device\n");
         g_loggerPtr->Write("SysAudio:createSoundDevice", TLogSeverity::LogError, "Cannot start sound device\n");
+        SYS_DEBUG_PRINT(sysLogger.printf("SysAudio:createSoundDevice(): Cannot start sound device\n"));
+        return;
     }
     //LogScreen("AudioInputI2S::begin() completed sound device setup\n");
-    g_loggerPtr->Write("SysAudio:createSoundDevice", TLogSeverity::LogError, "completed sound device setup\n");
+    //g_loggerPtr->Write("SysAudio:createSoundDevice", TLogSeverity::LogError, "completed sound device setup\n");
     deviceCreated = true;
 }
 
@@ -85,7 +94,7 @@ void SysCodec::begin(void)
     if (!m_pimpl->m_codecPtr) {
         if (g_i2cMasterPtr) {
             m_pimpl->m_codecPtr = new SysCodecWM8731(g_i2cMasterPtr, WM8731_I2C_ADDRESS);
-            if (m_pimpl->m_codecPtr) { SYS_DEBUG_PRINT(sysLogger.printf("SysCodec::begin(): successfully created the WM8731 codec\n")); }
+            if (!m_pimpl->m_codecPtr) { SYS_DEBUG_PRINT(sysLogger.printf("SysCodec::begin(): failed to create SysCodecWM8731\n")); }
         } else {
             SYS_DEBUG_PRINT(sysLogger.printf("SysCodec::begin(): ERROR: g_i2cMasterPtr is nullptr\n"));
         }
@@ -101,6 +110,7 @@ void SysCodec::disable(void)
 void SysCodec::enable(void)
 {
     if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->enable(); }
+    else { SYS_DEBUG_PRINT(sysLogger.printf("SysCodec::enable(): m_codecPtr is invalid\n")); }
 }
 
 bool SysCodec::isEnabled()
@@ -190,14 +200,11 @@ bool SysCodec::writeI2C(unsigned int addr, unsigned int val)
 // SysAudioInputI2S
 /////////////////////
 struct SysAudioInputI2S::_impl {
-    audio_block_t *block_left  = nullptr;
-	audio_block_t *block_right = nullptr;
-
     int16_t* buffer = nullptr;
 };
 
 SysAudioInputI2S::SysAudioInputI2S(void)
-: AudioStream(0, NULL), m_pimpl(std::make_unique<_impl>())
+: AudioStream(0, (audio_block_t**)NULL), m_pimpl(std::make_unique<_impl>())
 {
 
 }
@@ -207,9 +214,19 @@ SysAudioInputI2S::~SysAudioInputI2S()
 
 }
 
+void SysAudioInputI2S::enable()
+{
+	m_enable = true;
+}
+
+void SysAudioInputI2S::disable()
+{
+	m_enable = false;
+}
+
 void SysAudioInputI2S::update(void)
 {
-    //LogScreen("AudioInputI2S::update(): entered\n");
+    if (!m_enable) { return; }
 
     if (!m_soundDevPtr) { return; }
     size_t buffSize = AUDIO_SAMPLES_PER_BLOCK*2*sizeof(int16_t);
@@ -246,6 +263,7 @@ void SysAudioInputI2S::update(void)
 
     transmit(new_left, 0);
     transmit(new_right, 1);
+
     if (new_left) release(new_left);
     if (new_right) release(new_right);
 }
@@ -258,6 +276,7 @@ void SysAudioInputI2S::begin(void)
     createSoundDevice();
 
     update_setup();
+    enable();
     m_isInitialized = true;
 }
 
@@ -279,8 +298,19 @@ SysAudioOutputI2S::~SysAudioOutputI2S()
 
 }
 
+void SysAudioOutputI2S::enable()
+{
+	m_enable = true;
+}
+
+void SysAudioOutputI2S::disable()
+{
+	m_enable = false;
+}
+
 void SysAudioOutputI2S::update(void)
 {
+    if (!m_enable) { return; }
     if (!m_soundDevPtr) { return; }
 
     int16_t* ptr = m_pimpl->buffer;
@@ -309,6 +339,7 @@ void SysAudioOutputI2S::begin(void)
     createSoundDevice();
 
 	update_setup();
+    enable();
     m_isInitialized = true;
 }
 
@@ -320,7 +351,7 @@ struct SysAudioInputUsb::_impl {
 };
 
 SysAudioInputUsb::SysAudioInputUsb(void)
-: AudioStream(0, NULL), m_pimpl(std::make_unique<_impl>())
+: AudioStream(0, (audio_block_t**)NULL), m_pimpl(std::make_unique<_impl>())
 {
 
 }

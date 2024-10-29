@@ -10,7 +10,7 @@ struct SysAudioInputUsb::_impl {
 };
 
 SysAudioInputUsb::SysAudioInputUsb(void)
-: AudioStream(0, NULL), m_pimpl(std::make_unique<_impl>())
+: AudioStream(0, (audio_block_t**)NULL), m_pimpl(std::make_unique<_impl>())
 {
 
 }

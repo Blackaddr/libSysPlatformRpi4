@@ -357,7 +357,7 @@ bool SysCodecWM8731::write(unsigned int reg, unsigned int val)
 // Powerup and unmute the codec
 void SysCodecWM8731::enable(void)
 {
-    SYS_DEBUG_PRINT(sysLogger.printf("SysCodecWM8731::enable(): enbaling the codec\n"));
+    SYS_DEBUG_PRINT(sysLogger.printf("SysCodecWM8731::enable(): enabling the codec\n"));
     disable(); // disable first in case it was already powered up
 	delay(100);
 

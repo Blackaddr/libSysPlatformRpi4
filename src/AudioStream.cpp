@@ -546,7 +546,7 @@ void AudioStream::update_stop(void)
 }
 
 void AudioStream::update_all(void) {
-	SysCpuControl::AudioTriggerInterrupt();
+	software_isr();  //SysCpuControl::AudioTriggerInterrupt() doesn't work for RPI4
 }
 
 void AudioStream::setOrderedUpdate(bool orderedUpdate) {
