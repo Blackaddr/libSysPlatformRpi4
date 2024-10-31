@@ -33,8 +33,8 @@ static const u8 DNSServer[]      = {192, 168, 0, 1};
 #define I2C_SLAVE_ADDRESS	0x1A	// 7 bit slave address
 
 // UARTS
-constexpr unsigned UART_BAUD_RATE = 2000000;
-//constexpr unsigned UART_BAUD_RATE = 921600;
+//constexpr unsigned UART_BAUD_RATE = 2000000;  // unsure if this is totally reliable yet
+constexpr unsigned UART_BAUD_RATE = 921600;
 
 namespace SysPlatform {
 
@@ -98,6 +98,7 @@ static int hdlcTransportWrite(const uint8_t *data, uint16_t length)
 {
   if (!g_hdlcPtr) { return 0; }
   g_hdlcPtr->Write(data, length);
+  g_hdlcPtr->Flush();
   return length;
 }
 
@@ -188,6 +189,7 @@ int  sysInitialize() {
 		bOK = g_debugPtr->Initialize(UART_BAUD_RATE, 8, 1, CSerialDevice::ParityNone);
 		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "DEBUG serial init FAILED!\n"); }
 		bOK = g_hdlcPtr->Initialize(UART_BAUD_RATE, 8, 1, CSerialDevice::ParityNone);
+		g_hdlcPtr->SetOptions(0);  // Disable auto CR when LR sent
 		if (!bOK) { g_loggerPtr->Write("sysInitialize()", TLogSeverity::LogError, "HDLC serial init FAILED!\n"); }
 
 		// Initialize the HDLCpp

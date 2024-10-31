@@ -283,11 +283,7 @@ uint8_t  SysUsbMidi::getData2()
 
 void SysUsbMidi::sendSysEx(size_t sysExDataLength, uint8_t* sysExData)
 {
-#if 0 // doesn't work yet
     if (!sysExData || (sysExDataLength < 1)) { return; }
-
-    static bool msgSent = false;
-    if (msgSent) return;
 
     // The sysex data requires two more bytes for the start and end bytes.
     uint8_t buffer[sysExDataLength+2];
@@ -298,6 +294,7 @@ void SysUsbMidi::sendSysEx(size_t sysExDataLength, uint8_t* sysExData)
 
     // sysLogger.printf("sendSysEx: ");
     // for (size_t i=0; i < sysExDataLength; i++) {
+    //     if (i % 3 == 0) { sysLogger.printf("\n"); }
     //     sysLogger.printf("%02X ", buffer[i]);
     // }
     // sysLogger.printf("\n");
@@ -309,21 +306,15 @@ void SysUsbMidi::sendSysEx(size_t sysExDataLength, uint8_t* sysExData)
         if (idx < sysExDataLength) data[1] = buffer[idx++];
         if (idx < sysExDataLength) data[2] = buffer[idx++];
         HdlcMidiMsgPktRaw pkt = makeMidiMsgPktRaw(0, data[0], data[1], data[2]);
-        //sysLogger.printf("--SysExSend: %02X %02X %02X\n", data[0], data[1], data[2]);
 
+        //static uint8_t count = 0;
+        //data[0] = 0xF0; data[1] = count++; data[2] = 0xF7;
+        //sysLogger.printf("--SysExSend: %02X %02X %02X\n", data[0], data[1], data[2]);
         {
             std::lock_guard<std::mutex> lock(g_hdlcMtx);
             g_hdlcppPtr->write((uint8_t*)&pkt, sizeof(pkt));
-            msgSent = true;
-            sysLogger.printf("HDLC SENT: ");
-            uint8_t* pktPtr = (uint8_t*)&pkt;
-            for (size_t i=0; i<sizeof(pkt); i++) {
-                sysLogger.printf("%02X ", pktPtr[i]);
-            }
-            sysLogger.printf("\n");
-            }
+        }
     }
-#endif
 }
 
 void SysUsbMidi::sendProgramChange(unsigned program, unsigned channel)
