@@ -12,8 +12,6 @@
 
 namespace SysPlatform {
 
-SysCodec sysCodec;
-
 CI2SSoundBaseDevice* m_soundDevPtr = nullptr;
 
 static void rxIsr(void *param)
@@ -73,6 +71,10 @@ static void createSoundDevice()
 /////////////
 // SysCodec
 /////////////
+SysCodec sysCodec;
+
+SysCodec& SysCodec::getCodec() { return sysCodec; }
+
 struct SysCodec::_impl {
     SysCodecWM8731* m_codecPtr = nullptr;
 };
