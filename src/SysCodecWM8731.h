@@ -21,6 +21,10 @@ public:
 	/// First disable, then cleanly power up and unmute the codec.
 	virtual void enable(void);
 
+    /// Sets if the gain controls are locked
+	/// @param lockEnabled when true, locks the gain settings from being altered
+	void setGainLock(bool lockEnabled);
+
 	/// Set the input gain of the codec's PGA for the left (TRS Tip) channel.
 	/// @param val an interger value from 31 = +12dB . . 1.5dB steps down to 0 = -34.5dB
 	void setLeftInputGain(int val);
@@ -104,7 +108,8 @@ private:
 private:
 	CI2CMaster *m_pI2CMaster;
 	u8 m_uchI2CAddress;
-	bool m_isEnabled = false;
+	bool m_isEnabled  = false;
+	bool m_gainLocked = false;
 
 	// A shadow array for the registers on the codec since the interface is write-only.
 	int regArray[WM8731_NUM_REGS];

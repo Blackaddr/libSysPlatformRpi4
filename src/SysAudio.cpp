@@ -125,6 +125,11 @@ void SysCodec::setLeftInputGain(int val)
     if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->setLeftInputGain(val); }
 }
 
+void SysCodec::setGainLock(bool lockEnabled)
+{
+    if (m_pimpl->m_codecPtr) { m_pimpl->m_codecPtr->setGainLock(lockEnabled); }
+}
+
 
 void SysCodec::setRightInputGain(int val)
 {

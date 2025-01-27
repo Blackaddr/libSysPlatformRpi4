@@ -158,9 +158,16 @@ void SysCodecWM8731::disable(void)
 	m_isEnabled = false;
 }
 
+void SysCodecWM8731::setGainLock(bool lockEnabled)
+{
+	m_gainLocked = lockEnabled;
+}
+
 // Set the PGA gain on the Left channel
 void SysCodecWM8731::setLeftInputGain(int val)
 {
+	if (m_gainLocked) { return; }
+
 	regArray[WM8731_LEFT_INPUT_GAIN_ADDR] &= ~WM8731_LEFT_INPUT_GAIN_MASK;
 	regArray[WM8731_LEFT_INPUT_GAIN_ADDR] |=
 			((val << WM8731_LEFT_INPUT_GAIN_SHIFT) & WM8731_LEFT_INPUT_GAIN_MASK);
@@ -195,6 +202,8 @@ void SysCodecWM8731::setLinkLeftRightIn(bool val)
 // Set the PGA input gain on the Right channel
 void SysCodecWM8731::setRightInputGain(int val)
 {
+	if (m_gainLocked) { return; }
+
 	regArray[WM8731_RIGHT_INPUT_GAIN_ADDR] &= ~WM8731_RIGHT_INPUT_GAIN_MASK;
 	regArray[WM8731_RIGHT_INPUT_GAIN_ADDR] |=
 			((val << WM8731_RIGHT_INPUT_GAIN_SHIFT) & WM8731_RIGHT_INPUT_GAIN_MASK);

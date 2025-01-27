@@ -125,7 +125,9 @@ static bool isInitialized = false;
 int  sysInitialize() {
 	g_interruptSysPtr      = CInterruptSystem::Get();
 	g_exceptionHandlerPtr  = CExceptionHandler::Get();
+#ifdef USE_SCREEN
 	g_screenPtr            = &g_screen;
+#endif
 	g_loggerPtr            = CLogger::Get();
 	g_actLedPtr            = CActLED::Get();
 	g_deviceNameServicePtr = CDeviceNameService::Get();
